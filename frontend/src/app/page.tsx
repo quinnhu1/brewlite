@@ -54,56 +54,50 @@ const categoryIcons = [
 
 export default function HomePage() {
   return (
-    <div className="w-full bg-[#F2ECE4]">
+    <div className="w-full bg-[#F2ECE4] overflow-x-clip">
       {/* SECTION 1: HERO SECTION */}
-      <section className="w-full max-w-[1440px] mx-auto px-8 md:px-16 pt-10 md:pt-12 pb-16 flex flex-col lg:flex-row items-center justify-between gap-4 relative overflow-visible">
-        
-        {/* CỘT TRÁI: TIÊU ĐỀ, NÚT VÀ CÁC ICON ĐÃ PHÓNG TO */}
-        <div className="w-full lg:w-[45%] flex flex-col items-start space-y-8 z-10">
-          <div className="space-y-1">
-            <h1 className="text-5xl sm:text-6xl lg:text-[4.8rem] font-bold tracking-tight text-[#2B100C] leading-[1.08]">
-              Awaken Your <br />
-              Senses With <br />
-              Every Sip
-            </h1>
-          </div>
+      <section className="w-full max-w-[1440px] mx-auto px-8 md:px-16 lg:px-24 pt-6 pb-16 min-h-[calc(100vh-100px)] grid grid-cols-1 lg:grid-cols-[4fr_6fr] items-center gap-6 relative">
 
-          {/* Nút Get start to và dịch phải */}
-          <div className="pl-6 md:pl-10">
-            <button className="px-14 sm:px-16 py-4 sm:py-5 bg-[#2B100C] text-[#F2ECE4] text-xl sm:text-2xl font-extrabold rounded-full shadow-lg hover:bg-[#3d1812] active:scale-[0.98] transition-all cursor-pointer">
+        {/* CỘT TRÁI */}
+        <div className="min-w-0 flex flex-col items-start z-10">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-[#2B100C] leading-[1.2]">
+            <span className="block whitespace-nowrap">Pure Goodness,</span>
+            <span className="block whitespace-nowrap">Ready When You Are</span>
+          </h1>
+
+          <div className="mt-12 flex flex-col items-start gap-3 w-fit">
+            <div className="pl-10 md:pl-20">
+              <button className="px-12 md:px-14 py-4 bg-[#2B100C] text-white text-2xl font-bold rounded-full hover:bg-[#3d1812] active:scale-[0.98] transition-all cursor-pointer">
               Get start
-            </button>
-          </div>
+              </button>
+            </div>
 
-          {/* Dãy icon nét vẽ (đã tăng kích thước khung chứa và khoảng cách) */}
-          <div className="flex items-center space-x-8 sm:space-x-10 pt-4">
+          <div className="flex items-center gap-6 sm:gap-10">
             {categoryIcons.map((icon) => (
-              <div
-                key={icon.id}
-                className="p-2 rounded-2xl flex items-center justify-center text-[#2B100C]/80 hover:bg-black/5 hover:text-[#2B100C] cursor-pointer transition-all transform hover:scale-110"
-                title={icon.alt}
-              >
-                {icon.svg}
-              </div>
+            <div
+              key={icon.id}
+              className="w-16 h-16 flex items-center justify-center text-[#2B100C]/80 hover:text-[#2B100C] cursor-pointer transition-transform hover:scale-110 [&>svg]:w-full [&>svg]:h-full"
+              title={icon.alt}
+            >
+              {icon.svg}
+            </div>
             ))}
           </div>
-        </div>
-
-        {/* CỘT PHẢI: HÌNH ẢNH LY CÀ PHÊ PHÓNG CỰC ĐẠI VÀ ĐẨY LÊN CAO */}
-        <div className="w-full lg:w-[55%] flex justify-center lg:justify-center items-center relative mt-6 lg:mt-0">
-          {/* Tăng kích thước khung lên tối đa w-[900px] h-[950px] và nhô cao -mt-36 */}
-          <div className="relative w-[480px] h-[520px] sm:w-[620px] sm:h-[680px] lg:w-[820px] lg:h-[880px] xl:w-[920px] xl:h-[980px] -mt-16 lg:-mt-36">
-            <Image
-              src="/home1.png"
-              alt="Awaken Your Senses With Every Sip - Craft Coffee"
-              fill
-              priority
-              className="object-contain drop-shadow-[0_30px_45px_rgba(43,16,12,0.22)]"
-            />
           </div>
         </div>
 
-      </section>
+        {/* CỘT PHẢI */}
+        <div className="w-full relative h-[540px] sm:h-[640px] lg:h-[800px] flex items-center justify-center">
+          <Image
+           src="/imghome/home3.png"
+            alt="Awaken Your Senses With Every Sip - Craft Coffee"
+            fill
+            priority
+            sizes="(min-width: 1024px) 60vw, 100vw"
+            className="object-contain object-center drop-shadow-[0_25px_35px_rgba(43,16,12,0.2)] lg:translate-x-10"
+         />
+        </div>
+      </section>  
 
       {/* SECTION 2: NEW DRINK SECTION */}
       <NewDrink />
