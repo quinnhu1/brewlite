@@ -1,5 +1,7 @@
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -8,11 +10,21 @@ async function bootstrap() {
     origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
   });
 
+  const config = new DocumentBuilder()
+    .setTitle('BrewLite API')
+    .setDescription('API documentation for BrewLite')
+    .setVersion('1.0')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('swagger', app, document);
+
   const port = Number(process.env.PORT ?? 3001);
 
   await app.listen(port);
 
   console.log(`BrewLite API is running at http://localhost:${port}`);
+  console.log(`Swagger UI: http://localhost:${port}/swagger`);
 }
 
 bootstrap();
