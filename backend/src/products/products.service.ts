@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
-  timTatCaSanPham() {
+  findAllProduct() {
     return this.prisma.product.findMany({
       where: { isActive: true },
       select: {
@@ -19,11 +19,12 @@ export class ProductsService {
         basePrice: true,
         imageUrl: true,
         stock: true,
+        categories: true,
       },
       orderBy: { productId: 'asc' },
     });
   }
-  async timMotSanPham(id: string) {
+  async findOneProduct(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { productId: id },
       select: {
@@ -33,6 +34,7 @@ export class ProductsService {
         basePrice: true,
         imageUrl: true,
         stock: true,
+        categories: true,
 
         product_size: {
           select: {
@@ -67,7 +69,7 @@ export class ProductsService {
 
     return {
       ...product,
-      toppings: product.product_toppings.map((pt) => pt.toppings),
+      toppings: (product as any).product_toppings.map((pt: any) => pt.toppings),
       product_toppings: undefined,
     };
   }

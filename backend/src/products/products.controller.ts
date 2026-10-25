@@ -5,11 +5,11 @@ import { ProductsService } from './products.service.js';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
   @Get()
-  timTatCaSanPham() {
-    return this.productsService.timTatCaSanPham();
+  findAllProduct() {
+    return this.productsService.findAllProduct();
   }
   @Get(':id')
-  timMotSanPham(@Param('id') id: string) {
-    return this.productsService.timMotSanPham(id);
+  findOneProduct(@Param('id') id: string) {
+    return this.productsService.findOneProduct(id);
   }
 }

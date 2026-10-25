@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 import Image from 'next/image';
 import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
 import CategoryFilter from '@/components/menu/category-filter';
 import ProductDetail, { Product } from '@/components/menu/product-detail';
+import { fetchProducts } from '@/libs/api';
+
 
 const categories = [
   'Classic Coffee',
@@ -15,24 +17,45 @@ const categories = [
   'Best Sellers',
 ];
 
-const products: Product[] = [
-  { id: 1, name: 'espresso', price: 40000, category: 'Classic Coffee', image: '/images/espresso.jpg' },
-  { id: 2, name: 'espresso', price: 40000, category: 'Classic Coffee', image: '/images/espresso.jpg' },
-  { id: 3, name: 'espresso', price: 40000, category: 'Classic Coffee', image: '/images/espresso.jpg' },
-  { id: 4, name: 'espresso', price: 40000, category: 'Classic Coffee', image: '/images/espresso.jpg' },
-  { id: 5, name: 'espresso', price: 40000, category: 'Cold & Brewed', image: '/images/espresso.jpg' },
-  { id: 6, name: 'espresso', price: 40000, category: 'Cold & Brewed', image: '/images/espresso.jpg' },
-  { id: 7, name: 'espresso', price: 40000, category: 'Tea', image: '/images/espresso.jpg' },
-  { id: 8, name: 'espresso', price: 40000, category: 'Best Sellers', image: '/images/espresso.jpg' },
-];
+const FALLBACK_IMAGE = '/imghome/home1.png';
 
 export default function MenuPage() {
-  const [activeCategory, setActiveCategory] = useState('Classic Coffee');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [activeCategory, setActiveCategory] = useState('Classic Coffee');
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-  const filteredProducts = activeCategory === 'Best Sellers' 
-    ? products 
-    : products.filter(p => p.category === activeCategory || p.category === 'Classic Coffee');
+    useEffect(() => {
+        const controller = new AbortController();
+
+        fetchProducts(controller.signal)
+            .then((data) =>
+                setProducts(
+                    data.map((p) => ({
+                        id: p.productId,
+                        name: p.productName,
+                        price: Number(p.basePrice),
+                        image: p.imageUrl ?? FALLBACK_IMAGE,
+                        category: p.categories ?? undefined,
+                        stock: p.stock,
+                        description: p.description,
+                    })),
+                ),
+            )
+            .catch((e) => {
+                if (e.name !== 'AbortError') setError(e.message);
+            })
+            .finally(() => setLoading(false));
+
+        return () => controller.abort();
+    }, []);
+    const normalize = (s?: string | null) => (s ?? '').trim().toLowerCase();
+    const filteredProducts = products.filter(
+        (p) =>
+            activeCategory === 'Best Sellers' ||
+            normalize(p.category) === normalize(activeCategory),
+    );
 
   return (
     <div className="min-h-screen bg-[#F2ECE4] flex flex-col justify-between">

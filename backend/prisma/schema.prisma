@@ -17,8 +17,10 @@ model Product {
   stock            Int                @default(0)
   version          Int                @default(1)
   isActive         Boolean            @default(true) @map("is_active")
+  categories       String?            @default("Tea") @db.VarChar(50)
   order_items      order_items[]
   product_size     product_size[]
+  product_sizes    product_sizes[]
   product_toppings product_toppings[]
 
   @@map("products")
@@ -150,6 +152,14 @@ model users {
   orders               orders[]
 
   @@index([email], map: "idx_users_email")
+}
+
+model product_sizes {
+  size_id          String  @id @db.Uuid
+  product_id       String  @db.Uuid
+  size_name        String  @db.VarChar(10)
+  additional_price Decimal @default(0.00) @db.Decimal(10, 2)
+  products         Product @relation(fields: [product_id], references: [productId], onDelete: Cascade, onUpdate: NoAction)
 }
 
 enum discount_type_enum {
