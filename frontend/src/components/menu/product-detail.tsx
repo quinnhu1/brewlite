@@ -62,13 +62,14 @@ export default function ProductDetail({ product, onBack, onAddToCart }: ProductD
 
   return (
     <div className="w-full max-w-5xl mx-auto py-4">
-      {/* Nút Quay lại nếu cần */}
+      {/* Nút Back */}
       {onBack && (
         <button
+          type="button"
           onClick={onBack}
           className="mb-6 flex items-center gap-2 text-sm font-semibold text-[#6F4E37] hover:text-[#2B100C] transition-colors cursor-pointer"
         >
-          ← Quay lại danh sách
+          ← Back
         </button>
       )}
 
