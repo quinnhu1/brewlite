@@ -9,8 +9,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
-  findAllProduct() {
-    return this.prisma.product.findMany({
+  async findAllProduct() {
+    const products = await this.prisma.product.findMany({
       where: { isActive: true },
       select: {
         productId: true,
@@ -20,13 +20,45 @@ export class ProductsService {
         imageUrl: true,
         stock: true,
         categories: true,
+        order_items: {
+          where: { orders: { is: { status: 'completed' } } },
+          select: { quantity: true },
+        },
       },
       orderBy: { productId: 'asc' },
     });
+
+    // Tính best seller từ các order đã hoàn tất, không phụ thuộc vào một field
+    // isBestSeller chưa tồn tại trong database.
+    const rankedProducts = products
+      .map((product) => ({
+        productId: product.productId,
+        unitsSold: product.order_items.reduce((sum, item) => sum + item.quantity, 0),
+      }))
+      .filter((product) => product.unitsSold > 0)
+      .sort((left, right) => right.unitsSold - left.unitsSold);
+    const bestSellerIds = new Set(
+      rankedProducts.slice(0, 3).map((product) => product.productId),
+    );
+
+    return products.map((product) => ({
+      productId: product.productId,
+      productName: product.productName,
+      description: product.description,
+      basePrice: product.basePrice,
+      imageUrl: product.imageUrl,
+      stock: product.stock,
+      categories: product.categories,
+      isBestSeller: bestSellerIds.has(product.productId),
+    }));
   }
   async findOneProduct(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { productId: id },
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('ID sản phẩm không hợp lệ');
+    }
+
+    const product = await this.prisma.product.findFirst({
+      where: { productId: id, isActive: true },
       select: {
         productId: true,
         productName: true,
@@ -67,10 +99,10 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
+    const { product_toppings, ...productDetail } = product;
     return {
-      ...product,
-      toppings: (product as any).product_toppings.map((pt: any) => pt.toppings),
-      product_toppings: undefined,
+      ...productDetail,
+      toppings: product_toppings.map(({ toppings }) => toppings),
     };
   }
   async giamSoLuongSanPham(
@@ -101,11 +133,21 @@ export class ProductsService {
     }
   }
   async tangSoLuongSanPham(
-      productId: string,quantity:number,tx:Prisma.TransactionClient=this.prisma,
-  ){
-    await tx.product.update({
-      where :{productId},
-      data:{stock:{increment:quantity},version:{increment:1}}
+    productId: string,
+    quantity: number,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new BadRequestException('Số lượng tăng phải là số nguyên dương');
+    }
+
+    const { count } = await tx.product.updateMany({
+      where: { productId, isActive: true },
+      data: { stock: { increment: quantity }, version: { increment: 1 } },
     });
+
+    if (count === 0) {
+      throw new NotFoundException(`Product with ID ${productId} not found`);
+    }
   }
 }

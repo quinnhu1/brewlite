@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
 export interface ApiProduct {
     productId: string;
@@ -8,6 +8,7 @@ export interface ApiProduct {
     imageUrl: string | null;
     stock: number;
     categories: string | null;
+    isBestSeller?: boolean;
 }
 
 export interface ApiSize {
@@ -39,7 +40,7 @@ export async function fetchProductById(
     id: string,
     signal?: AbortSignal,
 ): Promise<ApiProductDetail> {
-    const response = await fetch(`${API_URL}/products/${id}`, { signal });
+    const response = await fetch(`${API_URL}/products/${encodeURIComponent(id)}`, { signal });
     if (!response.ok) {
         throw new Error(`Không tải được sản phẩm (HTTP ${response.status})`);
     }
