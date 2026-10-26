@@ -67,7 +67,6 @@ export default function Navbar() {
         isVisible ? 'translate-y-0' : '-translate-y-full'
       }`}
     >
-      {/* Đã giảm py từ py-6 xuống py-3.5 để thanh menu hẹp và thanh thoát hơn */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-3.5 flex items-center justify-between">
         {/* Brand Logo & Slogan */}
         <div className="flex flex-col">
@@ -101,8 +100,8 @@ export default function Navbar() {
               <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 stroke-[2]" />
             </Link>
             <Link
-              href="/profile"
-              aria-label="Profile"
+              href="/signin"
+              aria-label="Sign in"
               className="hover:opacity-70 transition-opacity"
             >
               <User className="w-4 h-4 md:w-5 md:h-5 stroke-[2]" />
