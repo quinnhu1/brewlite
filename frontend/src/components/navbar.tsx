@@ -1,12 +1,46 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, ShoppingCart, User } from 'lucide-react';
 
-export default function Navbar() {
+const navLinks = [
+  { name: 'HOME', href: '/' },
+  { name: 'MENU', href: '/menu' },
+  { name: 'ABOUT US', href: '/about' },
+];
+
+function NavbarLinkList({ pathname }: { pathname: string | null }) {
+  return (
+    <nav className="flex items-center space-x-6 text-xs md:text-sm font-semibold tracking-wider text-[#2B100C]">
+      {navLinks.map((link) => {
+        const isActive = pathname === link.href;
+        return (
+          <Link
+            key={link.name}
+            href={link.href}
+            className={`relative py-1 transition-all ${
+              isActive ? 'font-bold' : 'hover:opacity-70'
+            }`}
+          >
+            {link.name}
+            {isActive && (
+              <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#2B100C] rounded-full" />
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function ActiveNavbarLinks() {
   const pathname = usePathname();
+  return <NavbarLinkList pathname={pathname} />;
+}
+
+export default function Navbar() {
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -26,12 +60,6 @@ export default function Navbar() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
-
-  const navLinks = [
-    { name: 'HOME', href: '/' },
-    { name: 'MENU', href: '/menu' },
-    { name: 'ABOUT US', href: '/about' },
-  ];
 
   return (
     <header
@@ -53,25 +81,9 @@ export default function Navbar() {
 
         {/* Links & Action Icons */}
         <div className="flex items-center space-x-6 md:space-x-8">
-          <nav className="flex items-center space-x-6 text-xs md:text-sm font-semibold tracking-wider text-[#2B100C]">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  className={`relative py-1 transition-all ${
-                    isActive ? 'font-bold' : 'hover:opacity-70'
-                  }`}
-                >
-                  {link.name}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#2B100C] rounded-full" />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+          <Suspense fallback={<NavbarLinkList pathname={null} />}>
+            <ActiveNavbarLinks />
+          </Suspense>
 
           <div className="flex items-center space-x-4 text-[#2B100C]">
             <button

@@ -1,94 +1,150 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import CategoryFilter from '@/components/menu/category-filter';
-import ProductDetail, { Product } from '@/components/menu/product-detail';
-import { products, categories } from '@/data/products';
+import { fetchProducts, ApiProduct } from '@/libs/api';
+import {
+  getProductImageUrl,
+  MENU_CATEGORIES,
+  normalizeCategory,
+} from '@/data/categories';
 
 function MenuContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const activeCategory = searchParams.get('category') || categories[0].name;
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const urlCategory = searchParams.get('category');
 
-  // Lọc sản phẩm theo URL query params
-  const filteredProducts = activeCategory === 'Best Sellers' 
-    ? products 
-    : products.filter(p => p.category === activeCategory || p.category === 'Classic Coffee');
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const activeCategory = useMemo(
+    () => MENU_CATEGORIES.find((category) => normalizeCategory(category) === normalizeCategory(urlCategory))
+      ?? MENU_CATEGORIES[0],
+    [urlCategory],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchProducts(controller.signal)
+      .then(setProducts)
+      .catch((reason: unknown) => {
+        if (reason instanceof Error && reason.name === 'AbortError') return;
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : 'Không tải được menu. Vui lòng kiểm tra kết nối API.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const handleSelectCategory = (category: string) => {
+    router.replace(`/menu?category=${encodeURIComponent(category)}`, { scroll: false });
+  };
+
+  const filteredProducts = useMemo(() => {
+    if (activeCategory === 'Best Sellers') {
+      return products.filter((product) => product.isBestSeller === true);
+    }
+
+    return products.filter(
+      (product) => normalizeCategory(product.categories) === normalizeCategory(activeCategory),
+    );
+  }, [activeCategory, products]);
 
   return (
-    <main className="min-h-screen bg-[#F2ECE4] px-6 md:px-16 pt-28 pb-16 max-w-7xl mx-auto w-full">
-      {/* Tiêu đề trang */}
-      <div className="text-xs uppercase tracking-wider text-[#6F4E37] font-semibold mb-6">
-        Menu / {activeCategory}
-      </div>
-
-      {/* Thanh lọc danh mục đổi URL */}
-      <CategoryFilter />
-
-      {/* Nếu đã chọn sản phẩm -> Hiển thị chi tiết */}
-      {selectedProduct ? (
-        <ProductDetail
-          product={selectedProduct}
-          onBack={() => setSelectedProduct(null)}
-        />
-      ) : (
-        /* Lưới sản phẩm */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredProducts.map((product, index) => (
-            <div
-              key={index}
-              onClick={() => setSelectedProduct(product)}
-              className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
-            >
-              <div className="relative w-full h-48 rounded-xl overflow-hidden mb-4 bg-gray-100">
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  sizes="(max-width: 768px) 100vw, 25vw"
-                />
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold capitalize text-[#2B100C] mb-2">
-                  {product.name}
-                </h3>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[#2B100C] font-semibold">
-                    <svg className="w-4 h-4 text-[#6F4E37]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    <span>{product.price.toLocaleString('vi-VN')}</span>
-                  </div>
-
-                  <button 
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedProduct(product);
-                    }}
-                    className="w-8 h-8 rounded-full bg-[#6F4E37] text-white flex items-center justify-center hover:bg-[#2B100C] transition-colors shadow cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+    <div className="w-full bg-[#F2ECE4] min-h-screen px-6 md:px-16 pt-28 pb-16">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-xs uppercase tracking-wider text-[#6F4E37] font-semibold mb-6">
+          Menu / {activeCategory}
         </div>
-      )}
-    </main>
+
+        <CategoryFilter
+          activeCategory={activeCategory}
+          onSelectCategory={handleSelectCategory}
+        />
+
+        {loading ? (
+          <p role="status" className="text-center text-xl text-[#4A2B20] py-10 font-medium animate-pulse">
+            Đang tải menu...
+          </p>
+        ) : error ? (
+          <div className="text-center py-10" role="alert">
+            <p className="text-lg text-red-600">{error}</p>
+            <p className="text-sm text-gray-600 mt-2">
+              Hãy kiểm tra backend tại địa chỉ được cấu hình trong NEXT_PUBLIC_API_URL.
+            </p>
+          </div>
+        ) : filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <article
+                key={product.productId}
+                className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col"
+              >
+                <Link
+                  href={`/menu/${product.productId}`}
+                  aria-label={`Xem chi tiết ${product.productName}`}
+                  className="block relative w-full h-48 rounded-xl overflow-hidden mb-4 bg-gray-100"
+                >
+                  <Image
+                    src={getProductImageUrl(product.imageUrl)}
+                    alt={product.productName}
+                    fill
+                    className="object-cover transition-transform duration-300 hover:scale-105"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  />
+                </Link>
+
+                <h2 className="text-lg font-bold text-[#2B100C] mb-2">
+                  {product.productName}
+                </h2>
+                {product.description && (
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
+                )}
+
+                <div className="flex items-center justify-between gap-3 mt-auto pt-2">
+                  <span className="font-semibold text-[#2B100C]">
+                    {Number(product.basePrice).toLocaleString('vi-VN')}đ
+                  </span>
+                  <Link
+                    href={`/menu/${product.productId}`}
+                    aria-label={`Chọn ${product.productName}`}
+                    className="w-9 h-9 shrink-0 rounded-full bg-[#6F4E37] text-white flex items-center justify-center hover:bg-[#2B100C] transition-colors"
+                  >
+                    <span aria-hidden="true" className="text-xl leading-none">+</span>
+                  </Link>
+                </div>
+                {product.stock <= 0 && (
+                  <p className="text-xs text-red-600 mt-2">Tạm hết hàng</p>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="col-span-full text-center py-20">
+            <p className="text-lg text-gray-600">
+              Chưa có sản phẩm nào trong danh mục “{activeCategory}”.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
 export default function MenuPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F2ECE4] flex items-center justify-center text-[#2B100C]">Loading menu...</div>}>
+    <Suspense fallback={<p role="status" className="py-16 text-center text-[#2B100C]">Đang mở menu...</p>}>
       <MenuContent />
     </Suspense>
   );

@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -27,4 +29,7 @@ async function bootstrap() {
   console.log(`Swagger UI: http://localhost:${port}/swagger`);
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  console.error('Failed to start BrewLite API', error);
+  process.exitCode = 1;
+});

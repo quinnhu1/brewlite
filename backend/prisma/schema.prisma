@@ -17,6 +17,7 @@ model Product {
   stock            Int                @default(0)
   version          Int                @default(1)
   isActive         Boolean            @default(true) @map("is_active")
+  categories       String?            @default("Tea") @db.VarChar(50)
   order_items      order_items[]
   product_size     product_size[]
   product_toppings product_toppings[]
@@ -151,6 +152,7 @@ model users {
 
   @@index([email], map: "idx_users_email")
 }
+
 
 enum discount_type_enum {
   percentage
