@@ -1,19 +1,18 @@
-
 services:
   db:
     image: postgres:16
     container_name: brewlite-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: brewlite
-      POSTGRES_PASSWORD: CONGNGHEPHANMEM12345
-      POSTGRES_DB: brewlite
+      POSTGRES_USER: ${POSTGRES_USER:-brewlite}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CONGNGHEPHANMEM12345}
+      POSTGRES_DB: ${POSTGRES_DB:-brewlite}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - brewlite_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U brewlite -d brewlite"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
