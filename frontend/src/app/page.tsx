@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import NewDrink from '@/components/newdrink';
@@ -53,66 +53,76 @@ const categoryIcons = [
   },
 ];
 
-export default function HomePage() {
+function LoginSuccessToast() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [showToast, setShowToast] = useState(false);
   const [userName, setUserName] = useState('');
+  const showToast = searchParams.get('loginSuccess') === 'true';
 
   useEffect(() => {
-    // Kiểm tra xem vừa đăng nhập thành công chuyển về Home hay không
-    if (searchParams.get('loginSuccess') === 'true') {
-      setShowToast(true);
+    // Chỉ xử lý khi vừa đăng nhập thành công và được chuyển về Home.
+    if (!showToast) return;
 
-      // Gọi API lấy thông tin người dùng mới nhất từ backend
-      const fetchProfile = async () => {
-        try {
-          const data = await apiRequest('/auth/me');
-          if (data?.username || data?.name) {
-            setUserName(data.username || data.name);
-          }
-        } catch {
-          const localUser = localStorage.getItem('user');
-          if (localUser) {
-            try {
-              const parsed = JSON.parse(localUser);
-              setUserName(parsed.username || parsed.name || '');
-            } catch {
+    // Gọi API lấy thông tin người dùng mới nhất từ backend.
+    const fetchProfile = async () => {
+      try {
+        const data = await apiRequest('/auth/me');
+        const name = data.username ?? data.name;
+        if (typeof name === 'string') {
+          setUserName(name);
+        }
+      } catch {
+        const localUser = localStorage.getItem('user');
+        if (localUser) {
+          try {
+            const parsed: unknown = JSON.parse(localUser);
+            if (parsed && typeof parsed === 'object') {
+              const cached = parsed as { username?: unknown; name?: unknown };
+              const name = cached.username ?? cached.name;
+              if (typeof name === 'string') setUserName(name);
             }
+          } catch {
+            // Bỏ qua cache lỗi định dạng; toast vẫn hiển thị bình thường.
           }
         }
-      };
+      }
+    };
 
-      fetchProfile();
+    void fetchProfile();
 
-      // Tự động đóng thông báo sau 4 giây và xóa query param
-      const timer = setTimeout(() => {
-        setShowToast(false);
-        router.replace('/');
-      }, 4000);
+    // Tự động đóng thông báo sau 4 giây bằng cách xóa query param.
+    const timer = setTimeout(() => {
+      router.replace('/');
+    }, 4000);
 
-      return () => clearTimeout(timer);
-    }
-  }, [searchParams, router]);
+    return () => clearTimeout(timer);
+  }, [showToast, router]);
+
+  if (!showToast) return null;
 
   return (
-    <div className="w-full bg-[#F2ECE4] overflow-x-clip relative">
-      {/* THÔNG BÁO ĐĂNG NHẬP THÀNH CÔNG (TOAST) */}
-      {showToast && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl bg-[#2B100C] px-5 py-3.5 text-white shadow-2xl transition-all border border-[#ebdcd0]/20 animate-fade-in">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
-            ✓
+    <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl bg-[#2B100C] px-5 py-3.5 text-white shadow-2xl transition-all border border-[#ebdcd0]/20 animate-fade-in">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+        ✓
+      </span>
+      <div className="text-sm font-medium">
+        Đăng nhập thành công!{' '}
+        {userName && (
+          <span className="font-semibold text-[#f0d4b8]">
+            Chào mừng {userName} quay trở lại.
           </span>
-          <div className="text-sm font-medium">
-            Đăng nhập thành công!{' '}
-            {userName && (
-              <span className="font-semibold text-[#f0d4b8]">
-                Chào mừng {userName} quay trở lại.
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <div className="w-full bg-[#F2ECE4] overflow-x-clip relative">
+      <Suspense fallback={null}>
+        <LoginSuccessToast />
+      </Suspense>
 
       {/* SECTION 1: HERO SECTION */}
       <section className="w-full max-w-[1440px] mx-auto px-8 md:px-16 lg:px-24 pt-6 pb-16 min-h-[calc(100vh-100px)] grid grid-cols-1 lg:grid-cols-[4fr_6fr] items-center gap-6 relative">

@@ -89,5 +89,5 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     }
     throw new Error(message);
   }
-  return data as Record<string, any>;
+  return data as Record<string, unknown>;
 }

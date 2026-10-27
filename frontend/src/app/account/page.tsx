@@ -44,7 +44,9 @@ export default function AccountPage() {
       try {
         // Gọi API backend lấy thông tin người dùng
         const res = await apiRequest("/auth/me");
-        const userData = res.user || res;
+        const userData = (
+          res.user && typeof res.user === "object" ? res.user : res
+        ) as UserProfile;
         setUser(userData);
         setFormData({
           name: userData.name || userData.username || "",
@@ -102,8 +104,12 @@ export default function AccountPage() {
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setMessage("Cập nhật thông tin thành công!");
-    } catch (err: any) {
-      setMessage(err.message || "Cập nhật thất bại, vui lòng thử lại.");
+    } catch (err: unknown) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Cập nhật thất bại, vui lòng thử lại.",
+      );
     } finally {
       setUpdating(false);
     }

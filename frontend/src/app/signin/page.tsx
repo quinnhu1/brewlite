@@ -1,22 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthInput from "@/components/account/input";
 import { apiRequest } from "@/libs/api";
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState("");
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("registered") === "1") {
-      setNotice("Đăng ký thành công! Hãy đăng nhập bằng email hoặc số điện thoại vừa đăng ký.");
-    }
-  }, []);
+  const notice = searchParams.get("registered") === "1"
+    ? "Đăng ký thành công! Hãy đăng nhập bằng email hoặc số điện thoại vừa đăng ký."
+    : "";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -40,7 +37,9 @@ export default function SignInPage() {
       }
 
       localStorage.setItem("token", token);
-      if (res.user) localStorage.setItem("user", JSON.stringify(res.user));
+      if (res.user && typeof res.user === "object") {
+        localStorage.setItem("user", JSON.stringify(res.user));
+      }
 
       router.replace("/account");
     } catch (err: unknown) {
@@ -75,5 +74,13 @@ export default function SignInPage() {
         <Link href="/signup" className="font-bold">Sign up</Link>
       </p>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInContent />
+    </Suspense>
   );
 }
