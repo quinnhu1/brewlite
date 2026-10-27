@@ -2,302 +2,213 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { fetchProductById, ApiProductDetail, ApiTopping } from '@/libs/api';
-import { getProductImageUrl } from '@/data/categories';
+import { fetchProductById } from '@/libs/api';
+import type { ApiProductDetail } from '@/libs/api';
+import type { DrinkSize, ToppingOption } from '@/store/useCartStore';
 
-export interface CartItem {
-  productId: string;
+export interface Product {
+  id: string;
   name: string;
+  price: number;
+  category: string;
   image: string;
-  sizeId: string | null;
-  size: string | null;
-  toppings: ApiTopping[];
+  stock: number;
+  isBestSeller?: boolean;
+}
+
+export interface AddToCartPayload {
+  product_id: string;
+  product_name: string;
+  image_url: string;
+  base_price: number;
+  size: DrinkSize;
+  toppings: ToppingOption[];
   quantity: number;
-  unitPrice: number;
-  totalPrice: number;
+  stock: number;
 }
 
 interface ProductDetailProps {
-  productId: string;
+  product: Product;
   onBack?: () => void;
-  onAddToCart?: (item: CartItem) => void;
+  onAddToCart: (orderData: AddToCartPayload) => void;
 }
 
-const SIZE_ORDER = ['S', 'M', 'L', 'XL'];
-const EMPTY_TOPPINGS: ApiTopping[] = [];
+const money = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 
-type ProductLoadResult = {
-  productId: string;
-  detail?: ApiProductDetail;
-  error?: string;
-};
-
-function getErrorMessage(reason: unknown): string {
-  return reason instanceof Error
-    ? reason.message
-    : 'Không tải được thông tin sản phẩm. Vui lòng thử lại.';
-}
-
-export default function ProductDetail({ productId, onBack, onAddToCart }: ProductDetailProps) {
-  const [loadResult, setLoadResult] = useState<ProductLoadResult | null>(null);
-  const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null);
-  const [selectedToppingIds, setSelectedToppingIds] = useState<string[]>([]);
+export default function ProductDetail({ product, onAddToCart }: ProductDetailProps) {
+  const [details, setDetails] = useState<ApiProductDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedSize, setSelectedSize] = useState<DrinkSize>('S');
+  const [selectedToppings, setSelectedToppings] = useState<ToppingOption[]>([]);
   const [quantity, setQuantity] = useState(1);
-  const [cartMessage, setCartMessage] = useState<string | null>(null);
-
-  // Key the result by product ID so a route change immediately renders the loading
-  // state without synchronously setting state inside the effect.
-  const resultMatchesProduct = loadResult?.productId === productId;
-  const detail = resultMatchesProduct ? loadResult.detail ?? null : null;
-  const error = resultMatchesProduct ? loadResult.error ?? null : null;
-  const loading = !resultMatchesProduct;
+  const [addedMessage, setAddedMessage] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
-
-    fetchProductById(productId, controller.signal)
+    fetchProductById(product.id, controller.signal)
       .then((data) => {
-        if (controller.signal.aborted) return;
-
-        const preferredSize = [...data.product_size].sort((left, right) => {
-          const leftIndex = SIZE_ORDER.indexOf(left.size.toUpperCase());
-          const rightIndex = SIZE_ORDER.indexOf(right.size.toUpperCase());
-          return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex)
-            - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
-        })[0];
-
-        setLoadResult({ productId, detail: data });
-        setSelectedSizeId(preferredSize?.size_id ?? null);
-        setSelectedToppingIds([]);
-        setQuantity(1);
-        setCartMessage(null);
+        setDetails(data);
+        const firstSize = data.product_size[0]?.size;
+        if (firstSize === 'S' || firstSize === 'M' || firstSize === 'L') {
+          setSelectedSize(firstSize);
+        }
       })
       .catch((reason: unknown) => {
-        if (controller.signal.aborted || (reason instanceof Error && reason.name === 'AbortError')) {
-          return;
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : 'Could not load product details.');
         }
-        setLoadResult({ productId, error: getErrorMessage(reason) });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
       });
-
     return () => controller.abort();
-  }, [productId]);
+  }, [product.id]);
 
-  const sizes = useMemo(
-    () => [...(detail?.product_size ?? [])].sort((left, right) => {
-      const leftIndex = SIZE_ORDER.indexOf(left.size.toUpperCase());
-      const rightIndex = SIZE_ORDER.indexOf(right.size.toUpperCase());
-      return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex)
-        - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
-    }),
-    [detail?.product_size],
+  const basePrice = Number(details?.basePrice ?? product.price);
+  const currentSize = details?.product_size.find((option) => option.size === selectedSize);
+  const sizeExtra = Number(currentSize?.add_price ?? 0);
+  const toppingsPrice = selectedToppings.reduce((sum, topping) => sum + topping.price, 0);
+  const unitPrice = basePrice + sizeExtra + toppingsPrice;
+  const sizeOptions = useMemo(() => details?.product_size ?? [], [details]);
+  const toppingOptions = useMemo<ToppingOption[]>(
+    () =>
+      (details?.toppings ?? []).map((topping) => ({
+        topping_id: topping.topping_id,
+        topping_name: topping.topping_name,
+        price: Number(topping.price),
+        is_active: true,
+      })),
+    [details],
   );
-  const toppings = detail?.toppings ?? EMPTY_TOPPINGS;
-  const selectedSize = sizes.find((size) => size.size_id === selectedSizeId);
-  const stock = detail?.stock ?? 0;
-  const outOfStock = stock <= 0;
-  const maxQuantity = Math.max(stock, 1);
 
-  const unitPrice = useMemo(() => {
-    const basePrice = Number(detail?.basePrice ?? 0);
-    const sizeExtra = Number(selectedSize?.add_price ?? 0);
-    const toppingExtra = toppings
-      .filter((topping) => selectedToppingIds.includes(topping.topping_id))
-      .reduce((sum, topping) => sum + Number(topping.price), 0);
-    return basePrice + sizeExtra + toppingExtra;
-  }, [detail?.basePrice, selectedSize, toppings, selectedToppingIds]);
-
-  const handleQuantityChange = (direction: 'increase' | 'decrease') => {
-    setQuantity((current) => direction === 'decrease'
-      ? Math.max(1, current - 1)
-      : Math.min(maxQuantity, current + 1));
+  const toggleTopping = (topping: ToppingOption) => {
+    setSelectedToppings((previous) =>
+      previous.some((item) => item.topping_id === topping.topping_id)
+        ? previous.filter((item) => item.topping_id !== topping.topping_id)
+        : [...previous, topping],
+    );
   };
 
-  const handleAddToCart = () => {
-    if (!detail || outOfStock || loading || error) return;
-
-    const selectedToppings = toppings.filter((topping) =>
-      selectedToppingIds.includes(topping.topping_id),
-    );
-    const image = getProductImageUrl(detail.imageUrl);
-    const cartItem: CartItem = {
-      productId: detail.productId,
-      name: detail.productName,
-      image,
-      sizeId: selectedSize?.size_id ?? null,
-      size: selectedSize?.size ?? null,
-      toppings: selectedToppings,
-      quantity,
-      unitPrice,
-      totalPrice: unitPrice * quantity,
-    };
-
-    if (onAddToCart) {
-      onAddToCart(cartItem);
-      setCartMessage(`Đã thêm ${quantity} × ${detail.productName} vào giỏ hàng.`);
+  const handleAdd = () => {
+    if (!details) return;
+    if (!currentSize) {
+      setError(`This product does not offer size ${selectedSize}.`);
+      return;
+    }
+    if (details.stock < quantity) {
+      setError(`Only ${details.stock} serving(s) remain in stock.`);
       return;
     }
 
-    try {
-      const savedCart: unknown = JSON.parse(localStorage.getItem('cart') ?? '[]');
-      const cart = Array.isArray(savedCart) ? savedCart : [];
-      cart.push(cartItem);
-      localStorage.setItem('cart', JSON.stringify(cart));
-      setCartMessage(`Đã thêm ${quantity} × ${detail.productName} vào giỏ hàng.`);
-    } catch {
-      setCartMessage('Không thể lưu giỏ hàng trên trình duyệt này.');
-    }
+    onAddToCart({
+      product_id: details.productId,
+      product_name: details.productName,
+      image_url: details.imageUrl?.startsWith('/') ? details.imageUrl : '/images/espresso.jpg',
+      base_price: basePrice,
+      size: selectedSize,
+      toppings: selectedToppings,
+      quantity,
+      stock: details.stock,
+    });
+    setAddedMessage(`${quantity} × ${details.productName} added to your cart.`);
+    setError('');
   };
 
-  if (loading) {
-    return (
-      <section className="w-full max-w-5xl mx-auto px-6 py-16 text-center text-[#6F4E37]" role="status">
-        {onBack && (
-          <button type="button" onClick={onBack} className="mb-6 underline">
-            ← Quay lại menu
-          </button>
-        )}
-        <p>Đang tải thông tin sản phẩm...</p>
-      </section>
-    );
-  }
-
-  if (error || !detail) {
-    return (
-      <section className="w-full max-w-5xl mx-auto px-6 py-16 text-center" role="alert">
-        <p className="text-red-600 mb-5">{error ?? 'Không tìm thấy sản phẩm.'}</p>
-        {onBack && (
-          <button type="button" onClick={onBack} className="underline text-[#3A1F19]">
-            ← Quay lại menu
-          </button>
-        )}
-      </section>
-    );
-  }
-
-  const image = getProductImageUrl(detail.imageUrl);
-
   return (
-    <section className="w-full max-w-5xl mx-auto px-6 py-8">
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-sm font-semibold text-[#6F4E37] hover:text-[#2B100C] transition-colors cursor-pointer"
-        >
-          ← Quay lại menu
-        </button>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
-        <div className="bg-white rounded-3xl p-6 shadow-sm">
-          <div className="relative w-full h-72 rounded-2xl overflow-hidden mb-6 bg-gray-100">
-            <Image
-              src={image}
-              alt={detail.productName}
-              fill
-              priority
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
-          <h1 className="text-2xl font-extrabold text-[#2B100C] mb-2">{detail.productName}</h1>
-          {detail.description && <p className="text-sm text-[#6F4E37] mb-4">{detail.description}</p>}
-          <p className="text-2xl font-bold text-[#2B100C]">
-            {unitPrice.toLocaleString('vi-VN')}đ
-          </p>
-          <p className={`mt-3 text-sm ${outOfStock ? 'text-red-600' : 'text-[#6F4E37]'}`}>
-            {outOfStock ? 'Hết hàng' : `Còn ${stock} sản phẩm`}
-          </p>
+    <section className="mx-auto grid w-full max-w-[1120px] grid-cols-1 items-center gap-10 py-5 md:grid-cols-[395px_minmax(0,1fr)] md:gap-[76px]">
+      <article className="mx-auto flex min-h-[470px] w-full max-w-[395px] flex-col rounded-[18px] bg-white px-7 py-6 text-[#2B100C]">
+        <div className="relative mx-auto mb-8 h-[270px] w-full max-w-[236px] overflow-hidden bg-[#eee5dc]">
+          <Image
+            src={product.image.startsWith('/') ? product.image : '/images/espresso.jpg'}
+            alt={product.name}
+            fill
+            priority
+            className="object-cover"
+            sizes="(max-width: 768px) 90vw, 236px"
+          />
         </div>
+        <h2 className="text-[25px] font-bold leading-tight">{product.name}</h2>
+        <div className="mt-auto flex items-center justify-between gap-4 pt-7">
+          <div className="flex items-center gap-3 text-[26px] font-bold tabular-nums">
+            <svg aria-hidden="true" className="h-6 w-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+              <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z" />
+              <circle cx="7.5" cy="7.5" r="1.2" />
+            </svg>
+            <span>{money(unitPrice)}</span>
+          </div>
+          <div className="flex h-9 items-center gap-4 rounded-full bg-[#715039] px-4 text-[17px] font-bold text-white">
+            <button type="button" aria-label="Increase quantity" disabled={quantity >= product.stock} onClick={() => setQuantity((value) => Math.min(value + 1, product.stock))} className="leading-none disabled:opacity-40">+</button>
+            <span className="min-w-3 text-center tabular-nums">{quantity}</span>
+            <button type="button" aria-label="Decrease quantity" onClick={() => setQuantity((value) => Math.max(1, value - 1))} className="leading-none">-</button>
+          </div>
+        </div>
+      </article>
 
-        <div className="flex flex-col items-center text-center">
-          {sizes.length > 0 && (
-            <div className="mb-8 w-full">
-              <h2 className="text-xl font-bold text-[#2B100C] mb-4">Chọn size</h2>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                {sizes.map((size) => (
+      <div className="mx-auto w-full max-w-[560px] text-center text-[#2B100C]">
+        {loading && <p className="py-8 text-sm text-[#715039]">Loading size and toppings…</p>}
+        {error && <div role="alert" className="mb-4 rounded-lg border border-[#9C6C55] bg-white px-4 py-3 text-left text-sm text-[#602d20]">{error}</div>}
+
+        {!loading && details && (
+          <>
+            <section className="mb-8">
+              <h3 className="mb-5 text-[28px] font-bold lowercase">size</h3>
+              <div className="flex flex-wrap justify-center gap-5">
+                {sizeOptions.map((option) => (
                   <button
-                    key={size.size_id}
+                    key={option.size_id}
                     type="button"
-                    onClick={() => setSelectedSizeId(size.size_id)}
-                    aria-pressed={selectedSizeId === size.size_id}
-                    className={`min-w-16 px-4 py-2 rounded-xl font-bold transition-all shadow-sm cursor-pointer ${
-                      selectedSizeId === size.size_id
-                        ? 'bg-[#2B100C] text-[#F2ECE4]'
-                        : 'bg-[#6F4E37] text-[#F2ECE4] hover:opacity-90'
-                    }`}
+                    aria-pressed={selectedSize === option.size}
+                    onClick={() => setSelectedSize(option.size)}
+                    title={`${option.size}${Number(option.add_price) ? `, +${money(Number(option.add_price))} VND` : ''}`}
+                    className={`min-w-[74px] rounded-[14px] px-4 py-2 text-[25px] font-semibold leading-none text-white transition-colors ${selectedSize === option.size ? 'bg-[#2B100C]' : 'bg-[#715039] hover:bg-[#5c3c2a]'}`}
                   >
-                    {size.size}
-                    {Number(size.add_price) > 0 && (
-                      <span className="ml-1 text-xs font-normal">
-                        +{Number(size.add_price).toLocaleString('vi-VN')}
-                      </span>
-                    )}
+                    {option.size}
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            </section>
 
-          {toppings.length > 0 && (
-            <div className="mb-8 w-full max-w-md">
-              <h2 className="text-xl font-bold text-[#2B100C] mb-5">Chọn topping</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-left">
-                {toppings.map((topping) => (
-                  <label
-                    key={topping.topping_id}
-                    className="flex items-center gap-3 text-[#2B100C] text-sm font-medium cursor-pointer select-none"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedToppingIds.includes(topping.topping_id)}
-                      onChange={() => setSelectedToppingIds((current) =>
-                        current.includes(topping.topping_id)
-                          ? current.filter((id) => id !== topping.topping_id)
-                          : [...current, topping.topping_id],
-                      )}
-                      className="w-4 h-4 accent-[#2B100C] rounded cursor-pointer"
-                    />
-                    <span>
-                      {topping.topping_name}
-                      <span className="text-[#6F4E37]">
-                        {' '}(+{Number(topping.price).toLocaleString('vi-VN')}đ)
-                      </span>
-                    </span>
-                  </label>
-                ))}
+            <section className="mb-10">
+              <h3 className="mb-5 text-[28px] font-bold lowercase">topping</h3>
+              {toppingOptions.length === 0 ? (
+                <p className="text-sm text-[#715039]">No toppings are available for this drink.</p>
+              ) : (
+                <div className="mx-auto grid max-w-[460px] grid-cols-1 gap-x-9 gap-y-4 text-left sm:grid-cols-2">
+                  {toppingOptions.map((topping) => {
+                    const checked = selectedToppings.some((item) => item.topping_id === topping.topping_id);
+                    return (
+                      <label key={topping.topping_id} className="flex cursor-pointer items-center gap-3 text-[17px]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleTopping(topping)}
+                          className="h-[17px] w-[17px] shrink-0 appearance-none rounded-full border border-[#8b6c56] bg-transparent checked:border-[#2B100C] checked:bg-[#2B100C] checked:ring-2 checked:ring-[#f3ede5] checked:ring-offset-1 checked:ring-offset-[#f3ede5]"
+                        />
+                        <span>{topping.topping_name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={details.stock < 1 || !currentSize}
+              className="mx-auto min-h-[60px] w-full max-w-[292px] rounded-[18px] bg-[#715039] px-7 py-4 text-[20px] font-semibold text-white transition hover:bg-[#2B100C] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Add to cart
+            </button>
+            {addedMessage && (
+              <div role="status" className="mx-auto mt-4 max-w-[360px] rounded-lg border border-[#cbb7a6] bg-white/70 px-3 py-2 text-sm text-[#513421]">
+                {addedMessage}
               </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-center gap-5 bg-[#7E5E4E] text-white rounded-full px-5 py-2 mb-6">
-            <button
-              type="button"
-              onClick={() => handleQuantityChange('decrease')}
-              disabled={quantity <= 1}
-              aria-label="Giảm số lượng"
-              className="text-xl leading-none w-5 disabled:opacity-40"
-            >−</button>
-            <span className="font-bold min-w-4 text-center">{quantity}</span>
-            <button
-              type="button"
-              onClick={() => handleQuantityChange('increase')}
-              disabled={outOfStock || quantity >= maxQuantity}
-              aria-label="Tăng số lượng"
-              className="text-xl leading-none w-5 disabled:opacity-40"
-            >+</button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            disabled={outOfStock}
-            className="w-full max-w-sm bg-[#6F4E37] text-[#F2ECE4] text-base font-bold py-3.5 px-8 rounded-2xl hover:bg-[#2B100C] transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {outOfStock ? 'Hết hàng' : `Thêm vào giỏ · ${(unitPrice * quantity).toLocaleString('vi-VN')}đ`}
-          </button>
-          {cartMessage && <p role="status" className="mt-4 text-sm text-green-700">{cartMessage}</p>}
-        </div>
+            )}
+            <p className="mt-3 text-xs text-[#7f6655]">{details.stock} serving(s) available</p>
+          </>
+        )}
       </div>
     </section>
   );

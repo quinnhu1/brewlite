@@ -61,6 +61,7 @@ model order_items {
   unit_price          Decimal               @db.Decimal(10, 0)
   quantity            Int
   line_total          Decimal               @db.Decimal(10, 0)
+  note                String?               @db.VarChar(500)
   order_item_toppings order_item_toppings[]
   orders              orders                @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction)
   products            Product               @relation(fields: [product_id], references: [productId], onDelete: NoAction, onUpdate: NoAction)
@@ -75,6 +76,12 @@ model orders {
   subtotal             Decimal                @db.Decimal(10, 0)
   discount             Decimal                @default(0) @db.Decimal(10, 0)
   total                Decimal                @db.Decimal(10, 0)
+  pickup_method        String?                @map("pickup_method") @db.VarChar(20)
+  customer_name        String?                @map("customer_name") @db.VarChar(100)
+  customer_phone       String?                @map("customer_phone") @db.VarChar(20)
+  delivery_address     String?                @map("delivery_address") @db.VarChar(500)
+  order_note           String?                @map("order_note") @db.VarChar(500)
+  scheduled_at         DateTime?              @map("scheduled_at") @db.Timestamptz(6)
   created              DateTime               @default(now()) @db.Timestamptz(6)
   loyalty_transactions loyalty_transactions[]
   order_items          order_items[]
@@ -168,9 +175,12 @@ enum loyalty_type_enum {
 
 enum order_status {
   pending
+  paid
+  payment_failed
   confirmed
   processing
   preparing
+  ready
   shipping
   delivering
   completed
