@@ -1,0 +1,107 @@
+@startuml brewlite-activity-diagram
+skinparam backgroundColor #FFFFFF
+skinparam roundCorner 0
+skinparam Shadowing false
+skinparam PackageStyle rectangle
+skinparam ClassBackgroundColor #F9F9F9
+skinparam ClassBorderColor #333333
+skinparam ArrowColor #333333
+hide circle
+
+title Activity Diagram: Luồng Đặt và Thanh toán Đồ uống — BrewLite (Task 2.1)
+
+package "1. Khách hàng & Giao diện (Customer / Next.js UI)" {
+  circle "Bắt đầu\n(Start)" as START #000000
+
+  class CatalogPage {
+    - Product[] products
+    - DrinkSize selectedSize (S/M/L)
+    - Topping[] selectedToppings
+    - int stock
+    --
+    + loadProducts() : GET /products
+    + selectSizeAndToppings() : void
+    + calcRealtimePrice() : number
+    + checkStock() : boolean
+  }
+
+  diamond CheckStock <<choice>>
+
+  class CartPage {
+    - CartItem[] items
+    - string promoCode
+    - number subtotal
+    - number discount
+    - number total
+    --
+    + addItemOrMerge() : void
+    + updateQuantity(delta) : void
+    + applyPromotion(code) : void
+    + proceedToCheckout() : void
+  }
+
+  diamond CheckAuth <<choice>>
+
+  class AuthPage {
+    - string phoneOrEmail
+    - string password
+    - string jwtToken
+    --
+    + login() : POST /auth/login
+    + register() : POST /auth/register
+    + verifyJwtToken() : boolean
+  }
+}
+
+package "2. Hệ thống Đặt đơn & Cổng Thanh toán (NestJS API & Mock Payment)" {
+  class OrderAndPaymentService {
+    - UUID order_id
+    - int version (Optimistic Lock)
+    - string idempotency_key
+    - PaymentMethod method (E_WALLET / CARD)
+    - OrderStatus status
+    --
+    + createOrderWithLock() : POST /orders
+    + processCashlessPayment() : POST /payments
+    + retryPayment() : void
+    + earnLoyaltyPoints() : void
+  }
+
+  diamond CheckPayment <<choice>>
+}
+
+package "3. Quầy Pha chế & Nhận đơn (Barista & Order Tracking)" {
+  class BaristaAndTrackingPage {
+    - string order_code
+    - OrderStatus status (PAID -> PREPARING -> READY -> COMPLETED)
+    --
+    + pollOrderStatus() : GET /orders/me
+    + startPreparing() : void
+    + markReadyAndNotify() : void
+    + completeOrder() : void
+  }
+
+  circle "Kết thúc\n(Stop)" as STOP #000000
+}
+
+' Luồng kết nối chính & 3 nhánh ngoại lệ bắt buộc
+START --> CatalogPage : 1. Mở app & Xem thực đơn (Menu)
+CatalogPage --> CheckStock : Kiểm tra tồn kho (stock)
+
+CheckStock --> CatalogPage : [Ngoại lệ 1 - Hết hàng: stock == 0]\nBáo "Tạm hết hàng" & Khóa nút thêm giỏ
+CheckStock --> CartPage : 2. [Còn hàng: stock > 0]\nChọn Size, Topping & Thêm vào giỏ
+
+CartPage --> CheckAuth : 3. Kiểm tra đăng nhập khi nhấn "Thanh toán"
+
+CheckAuth --> AuthPage : [Ngoại lệ 2 - Chưa đăng nhập: !jwtToken]\nĐiều hướng Đăng nhập / Đăng ký
+AuthPage --> OrderAndPaymentService : Xác thực thành công (Có JWT Token)
+CheckAuth --> OrderAndPaymentService : [Đã đăng nhập: Có JWT Token]\nÁp mã giảm giá (nếu có) & Tạo đơn PENDING
+
+OrderAndPaymentService --> CheckPayment : 4. Gọi cổng thanh toán (kèm Idempotency-Key)
+
+CheckPayment --> OrderAndPaymentService : [Ngoại lệ 3 - Thanh toán thất bại: PAYMENT_FAILED]\nBáo lỗi & Cho phép Thử lại (retryPayment)
+CheckPayment --> STOP : [Khách hủy đơn khi lỗi]\nChuyển CANCELLED & Hoàn lại stock
+CheckPayment --> BaristaAndTrackingPage : 5. [Thanh toán thành công: PAID]\nTrừ stock, Cộng điểm & Gửi đơn xuống quầy
+
+BaristaAndTrackingPage --> STOP : 6. Barista pha chế (PREPARING -> READY)\n& Khách nhận đồ uống (COMPLETED)
+@enduml
