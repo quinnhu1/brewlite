@@ -9,8 +9,8 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service.js';
 import { CurrentUser } from './current-user.decorator.js';
-import { LoginDto } from './DTO/login.dto.js';
-import { RegisterDto } from './DTO/register.dto.js';
+import { LoginDto } from '../users/DTO/login.dto.js';
+import { RegisterDto } from '../users/DTO/register.dto.js';
 import { JwtAuthGuard, type AuthUser } from './jwt-auth.guard.js';
 
 @ApiTags('auth')

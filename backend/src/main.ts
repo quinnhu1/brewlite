@@ -8,9 +8,7 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
-  });
+  app.enableCors();
 
   // (2) Bật kiểm tra dữ liệu theo DTO.
   // whitelist: bỏ các trường thừa FE gửi lên.

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthInput from "@/components/account/input";
-import { apiRequest } from "@/libs/api"; 
+import { apiRequest } from "@/libs/api";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -17,26 +17,26 @@ export default function SignUpPage() {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const identifier = formData.get("identifier");
-    const username = formData.get("username");
-    const password = formData.get("password");
+    const email = String(formData.get("email") ?? "").trim();
+    const name = String(formData.get("name") ?? "").trim();
+    const phone = String(formData.get("phone") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
 
     try {
-      // Gửi trực tiếp thông tin đăng ký sang backend NestJS
+      // Gửi đúng các trường mà RegisterDto ở Backend yêu cầu
       await apiRequest("/auth/register", {
         method: "POST",
-        body: JSON.stringify({
-          email: identifier,
-          username: username,
-          password: password,
-        }),
+        body: JSON.stringify({ email, name, phone, password }),
       });
 
       alert("Đăng ký tài khoản thành công! Hãy đăng nhập nhé.");
-      // Chuyển hướng về trang đăng nhập
       router.push("/signin");
-    } catch (err: any) {
-      setError(err.message || "Đăng ký không thành công, vui lòng thử lại.");
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Đăng ký thất bại, vui lòng kiểm tra lại thông tin",
+      );
     } finally {
       setLoading(false);
     }
@@ -49,8 +49,16 @@ export default function SignUpPage() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && <p className="text-sm font-medium text-red-500">{error}</p>}
 
-        <AuthInput label="Email or phone" name="identifier" />
-        <AuthInput label="Username" name="username" />
+        {/* Khớp với trường email trong RegisterDto */}
+        <AuthInput label="Email" name="email" type="email" />
+
+        {/* Khớp với trường name trong RegisterDto */}
+        <AuthInput label="Full Name" name="name" type="text" />
+
+        {/* Khớp với định dạng phone 10 số bắt đầu bằng 0 ở RegisterDto */}
+        <AuthInput label="Phone number (10 digits)" name="phone" type="text" />
+
+        {/* Khớp với trường password tối thiểu 6 ký tự */}
         <AuthInput label="Password" name="password" type="password" />
 
         <button

@@ -2,24 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest } from "@/libs/api";
+import { apiRequest, ApiError } from "@/libs/api";
+import Link from "next/link";
 
 const tabs = ["Account", "Order Tracking", "Order History"] as const;
 
 interface UserProfile {
-  id?: string;
+  user_id?: string;
   name?: string;
   username?: string;
   email?: string;
   phone?: string;
-  points?: number;
+  point?: number;
   tier?: string;
 }
 
 export default function AccountPage() {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof tabs)[number]>("Account");
-  
+
   // State quản lý thông tin người dùng
   const [user, setUser] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState({
@@ -33,7 +34,8 @@ export default function AccountPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    // ĐỒNG BỘ: Dùng "accessToken" khớp hoàn toàn với trang Sign in
+    const token = localStorage.getItem("accessToken");
     if (!token) {
       router.push("/signin");
       return;
@@ -41,7 +43,7 @@ export default function AccountPage() {
 
     const fetchUserProfile = async () => {
       try {
-        // Gọi API backend lấy thông tin người dùng
+        // Gọi API backend lấy thông tin người dùng (/auth/me)
         const res = await apiRequest("/auth/me");
         const userData = res.user || res;
         setUser(userData);
@@ -51,8 +53,16 @@ export default function AccountPage() {
           email: userData.email || "",
           password: "",
         });
-      } catch {
-        // Lấy dữ liệu từ localStorage đã lưu lúc đăng nhập
+      } catch (err) {
+        // Token sai hoặc hết hạn (401): xóa token và về trang đăng nhập
+        if (err instanceof ApiError && err.status === 401) {
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("user");
+          router.push("/signin");
+          return;
+        }
+
+        // Fallback lấy dữ liệu từ localStorage nếu có cache
         const cachedUser = localStorage.getItem("user");
         if (cachedUser) {
           try {
@@ -79,7 +89,7 @@ export default function AccountPage() {
   }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
     localStorage.removeItem("user");
     router.push("/signin");
   };
@@ -97,12 +107,20 @@ export default function AccountPage() {
         }),
       });
 
-      const updatedUser = { ...user, name: formData.name, phone: formData.phone };
+      const updatedUser = {
+        ...user,
+        name: formData.name,
+        phone: formData.phone,
+      };
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setMessage("Cập nhật thông tin thành công!");
-    } catch (err: any) {
-      setMessage(err.message || "Cập nhật thất bại, vui lòng thử lại.");
+    } catch (err) {
+      setMessage(
+        err instanceof Error && err.message
+          ? err.message
+          : "Cập nhật thất bại, vui lòng thử lại.",
+      );
     } finally {
       setUpdating(false);
     }
@@ -111,7 +129,9 @@ export default function AccountPage() {
   if (loading) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center">
-        <p className="text-gray-600 font-medium">Đang tải thông tin tài khoản...</p>
+        <p className="text-gray-600 font-medium">
+          Đang tải thông tin tài khoản...
+        </p>
       </main>
     );
   }
@@ -125,9 +145,13 @@ export default function AccountPage() {
             {(user?.name || user?.username || "U").charAt(0).toUpperCase()}
           </div>
           <div className="text-sm">
-            <p className="font-semibold">{user?.username || user?.name || "Member"}</p>
-            <p className="text-gray-600">point: {user?.points ?? 0}</p>
-            <p className="text-gray-600 capitalize">{user?.tier || "Bronze member"}</p>
+            <p className="font-semibold">
+              {user?.username || user?.name || "Member"}
+            </p>
+            <p className="text-gray-600">point: {user?.point ?? 0}</p>
+            <p className="text-gray-600 capitalize">
+              {user?.tier || "Bronze member"}
+            </p>
           </div>
         </div>
 
@@ -150,10 +174,18 @@ export default function AccountPage() {
       <section className="rounded-lg border border-[#2b140e] p-6">
         {tab === "Account" && (
           <>
-            <h2 className="mb-4 text-center text-lg font-semibold">Account Details</h2>
+            <h2 className="mb-4 text-center text-lg font-semibold">
+              Account Details
+            </h2>
 
             {message && (
-              <p className={`mb-4 text-center text-sm font-medium ${message.includes("thành công") ? "text-emerald-700" : "text-red-500"}`}>
+              <p
+                className={`mb-4 text-center text-sm font-medium ${
+                  message.includes("thành công")
+                    ? "text-emerald-700"
+                    : "text-red-500"
+                }`}
+              >
                 {message}
               </p>
             )}
@@ -161,29 +193,39 @@ export default function AccountPage() {
             {/* Các trường nhập chi tiết tài khoản */}
             <div className="flex flex-col gap-4 max-w-md mx-auto">
               <div>
-                <label className="text-xs font-semibold text-gray-600">Name</label>
+                <label className="text-xs font-semibold text-gray-600">
+                  Name
+                </label>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="Your Name"
                   className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-[#2b140e] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-gray-600">Phone number</label>
+                <label className="text-xs font-semibold text-gray-600">
+                  Phone number
+                </label>
                 <input
                   type="text"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
                   placeholder="Phone number"
                   className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-[#2b140e] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-gray-600">Email</label>
+                <label className="text-xs font-semibold text-gray-600">
+                  Email
+                </label>
                 <input
                   type="email"
                   value={formData.email}
@@ -194,11 +236,15 @@ export default function AccountPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-gray-600">New Password (để trống nếu không đổi)</label>
+                <label className="text-xs font-semibold text-gray-600">
+                  New Password (để trống nếu không đổi)
+                </label>
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
                   placeholder="••••••••"
                   className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-[#2b140e] focus:outline-none"
                 />
@@ -225,8 +271,12 @@ export default function AccountPage() {
             </div>
           </>
         )}
-        {tab === "Order Tracking" && <p className="text-gray-600">Order Tracking...</p>}
-        {tab === "Order History" && <p className="text-gray-600">Order History...</p>}
+        {tab === "Order Tracking" && (
+          <p className="text-gray-600">Order Tracking...</p>
+        )}
+        {tab === "Order History" && (
+          <p className="text-gray-600">Order History...</p>
+        )}
       </section>
     </main>
   );
