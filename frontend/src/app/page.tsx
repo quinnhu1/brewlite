@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useSearchParams, useRouter } from 'next/navigation';
 import NewDrink from '@/components/newdrink';
-
+import { apiRequest } from '@/libs/api';
 const categoryIcons = [
   {
     id: 1,
@@ -53,8 +54,66 @@ const categoryIcons = [
 ];
 
 export default function HomePage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [showToast, setShowToast] = useState(false);
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    // Kiểm tra xem vừa đăng nhập thành công chuyển về Home hay không
+    if (searchParams.get('loginSuccess') === 'true') {
+      setShowToast(true);
+
+      // Gọi API lấy thông tin người dùng mới nhất từ backend
+      const fetchProfile = async () => {
+        try {
+          const data = await apiRequest('/auth/me');
+          if (data?.username || data?.name) {
+            setUserName(data.username || data.name);
+          }
+        } catch {
+          const localUser = localStorage.getItem('user');
+          if (localUser) {
+            try {
+              const parsed = JSON.parse(localUser);
+              setUserName(parsed.username || parsed.name || '');
+            } catch {
+            }
+          }
+        }
+      };
+
+      fetchProfile();
+
+      // Tự động đóng thông báo sau 4 giây và xóa query param
+      const timer = setTimeout(() => {
+        setShowToast(false);
+        router.replace('/');
+      }, 4000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, router]);
+
   return (
-    <div className="w-full bg-[#F2ECE4] overflow-x-clip">
+    <div className="w-full bg-[#F2ECE4] overflow-x-clip relative">
+      {/* THÔNG BÁO ĐĂNG NHẬP THÀNH CÔNG (TOAST) */}
+      {showToast && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl bg-[#2B100C] px-5 py-3.5 text-white shadow-2xl transition-all border border-[#ebdcd0]/20 animate-fade-in">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+            ✓
+          </span>
+          <div className="text-sm font-medium">
+            Đăng nhập thành công!{' '}
+            {userName && (
+              <span className="font-semibold text-[#f0d4b8]">
+                Chào mừng {userName} quay trở lại.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* SECTION 1: HERO SECTION */}
       <section className="w-full max-w-[1440px] mx-auto px-8 md:px-16 lg:px-24 pt-6 pb-16 min-h-[calc(100vh-100px)] grid grid-cols-1 lg:grid-cols-[4fr_6fr] items-center gap-6 relative">
 
@@ -68,36 +127,36 @@ export default function HomePage() {
           <div className="mt-12 flex flex-col items-start gap-3 w-fit">
             <div className="pl-10 md:pl-20">
               <button className="px-12 md:px-14 py-4 bg-[#2B100C] text-white text-2xl font-bold rounded-full hover:bg-[#3d1812] active:scale-[0.98] transition-all cursor-pointer">
-              Get start
+                Get start
               </button>
             </div>
 
-          <div className="flex items-center gap-6 sm:gap-10">
-            {categoryIcons.map((icon) => (
-            <div
-              key={icon.id}
-              className="w-16 h-16 flex items-center justify-center text-[#2B100C]/80 hover:text-[#2B100C] cursor-pointer transition-transform hover:scale-110 [&>svg]:w-full [&>svg]:h-full"
-              title={icon.alt}
-            >
-              {icon.svg}
+            <div className="flex items-center gap-6 sm:gap-10">
+              {categoryIcons.map((icon) => (
+                <div
+                  key={icon.id}
+                  className="w-16 h-16 flex items-center justify-center text-[#2B100C]/80 hover:text-[#2B100C] cursor-pointer transition-transform hover:scale-110 [&>svg]:w-full [&>svg]:h-full"
+                  title={icon.alt}
+                >
+                  {icon.svg}
+                </div>
+              ))}
             </div>
-            ))}
-          </div>
           </div>
         </div>
 
         {/* CỘT PHẢI */}
         <div className="w-full relative h-[540px] sm:h-[640px] lg:h-[800px] flex items-center justify-center">
           <Image
-           src="/imghome/home3.png"
+            src="/imghome/home3.png"
             alt="Awaken Your Senses With Every Sip - Craft Coffee"
             fill
             priority
             sizes="(min-width: 1024px) 60vw, 100vw"
             className="object-contain object-center drop-shadow-[0_25px_35px_rgba(43,16,12,0.2)] lg:translate-x-10"
-         />
+          />
         </div>
-      </section>  
+      </section>
 
       {/* SECTION 2: NEW DRINK SECTION */}
       <NewDrink />

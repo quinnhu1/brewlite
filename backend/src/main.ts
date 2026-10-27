@@ -1,6 +1,5 @@
 import 'dotenv/config';
 
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -20,6 +19,7 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
   });
+
 
   const config = new DocumentBuilder()
     .setTitle('BrewLite API')

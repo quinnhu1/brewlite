@@ -65,3 +65,29 @@ export async function parseApiError(response: Response): Promise<string> {
   }
   return `Yêu cầu thất bại (HTTP ${response.status})`;
 }
+
+
+/** Send a JSON request to the NestJS API, attaching the current session token when present. */
+export async function apiRequest(endpoint: string, options: RequestInit = {}) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type") && options.body != null) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+  const data: unknown = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    let message = `Yêu cầu thất bại (HTTP ${response.status})`;
+    if (data && typeof data === "object" && "message" in data) {
+      const apiMessage = (data as { message: unknown }).message;
+      if (Array.isArray(apiMessage)) message = apiMessage.join("; ");
+      else if (typeof apiMessage === "string") message = apiMessage;
+    }
+    throw new Error(message);
+  }
+  return data as Record<string, any>;
+}
