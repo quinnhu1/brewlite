@@ -1,16 +1,19 @@
 import 'dotenv/config';
 
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
-  });
+  app.enableCors();
+
+  // (2) Bật kiểm tra dữ liệu theo DTO.
+  // whitelist: bỏ các trường thừa FE gửi lên.
+  // transform: để @Transform trong DTO có tác dụng.
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const config = new DocumentBuilder()
     .setTitle('BrewLite API')
