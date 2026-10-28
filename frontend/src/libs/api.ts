@@ -66,7 +66,7 @@ export class ApiError extends Error {
 
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",

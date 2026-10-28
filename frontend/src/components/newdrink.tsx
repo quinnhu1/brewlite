@@ -1,14 +1,12 @@
-import React from 'react';
-import Image from 'next/image';
+import React from "react";
+import Image from "next/image";
 
 export default function NewDrinkSection() {
   return (
     <section className="w-full bg-[#F2ECE4] py-16 px-8 md:px-16 lg:px-24">
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16">
-        
         {/* CỘT TRÁI */}
         <div className="w-full lg:w-[58%] flex flex-col items-start text-[#2B100C]">
-          
           {/* Header Title */}
           <div className="relative">
             <h2 className="text-6xl sm:text-7xl lg:text-[5.5rem] font-black tracking-tight leading-[0.95] uppercase">
@@ -25,9 +23,10 @@ export default function NewDrinkSection() {
           </h3>
 
           <p className="mt-6 text-base sm:text-lg text-[#2B100C] leading-relaxed max-w-xl font-normal opacity-90">
-            A refreshing coffee drink made with espresso, cold milk and ice. It has a smooth, 
-            light flavor, balancing the strength of espresso with the creaminess of milk. 
-            Perfect for hot days or when you want a cool, energizing coffee without being too strong.
+            A refreshing coffee drink made with espresso, cold milk and ice. It
+            has a smooth, light flavor, balancing the strength of espresso with
+            the creaminess of milk. Perfect for hot days or when you want a
+            cool, energizing coffee without being too strong.
           </p>
 
           <div className="mt-10 flex flex-wrap items-start gap-12 sm:gap-20">
@@ -58,12 +57,12 @@ export default function NewDrinkSection() {
               src="/imghome/home2.png"
               alt="New Drink Iced Latte with Coconut"
               fill
+              sizes="(max-width:768px)100vw,50vw"
               priority
               className="object-contain drop-shadow-[0_20px_30px_rgba(43,16,12,0.18)]"
             />
           </div>
         </div>
-
       </div>
     </section>
   );

@@ -5,9 +5,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class LoginDto {
   // Có thể là email HOẶC số điện thoại (khớp với ô "Email or phone" ở FE)
   @ApiProperty({ example: 'long@example.com hoặc 0901234567' })
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty({ message: 'Vui lòng nhập email hoặc số điện thoại' })
   identifier: string;

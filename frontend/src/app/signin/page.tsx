@@ -34,6 +34,9 @@ export default function SignInPage() {
       if (res && res.accessToken) {
         localStorage.setItem("accessToken", res.accessToken);
       }
+      if (res && res.user) {
+        localStorage.setItem("user", JSON.stringify(res.user));
+      }
       //Công đoạn 4a (Thành công): Thông báo và chuyển hướng về trang chủ
 
       alert("Đăng nhập thành công!");
@@ -57,9 +60,8 @@ export default function SignInPage() {
       {/* Form đăng nhập tài khoản */}     {" "}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 {/* Hiển thị dòng thông báo lỗi màu đỏ nếu đăng nhập sai */}   
-           {" "}
-        {error && <p className="text-sm font-medium text-red-500">{error}</p>} 
-             {" "}
+          {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+               {" "}
         {/* Ô nhập Email hoặc Số điện thoại (Khớp với điều kiện kiểm tra @ ở Backend) */}
                {" "}
         <AuthInput label="Email or phone" name="identifier" type="text" />     

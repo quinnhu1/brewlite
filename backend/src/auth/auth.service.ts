@@ -95,7 +95,14 @@ export class AuthService {
   async me(user_id: string) {
     const user = await this.prisma.users.findUnique({
       where: { user_id },
-      select: publicUserSelect,
+      select: {
+        user_id: true,
+        email: true,
+        name: true,
+        phone: true,
+        point: true,
+        tier: true,
+      },
     });
     if (!user) {
       throw new UnauthorizedException('Tài khoản không tồn tại');
