@@ -74,7 +74,6 @@ export class ProductsService {
             size: true,
             add_price: true,
           },
-          orderBy: { size: 'asc' },
         },
         product_toppings: {
           where: {
@@ -99,9 +98,15 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    const { product_toppings, ...productDetail } = product;
+    const { product_toppings, product_size, ...productDetail } = product;
+    const sizeOrder = { S: 0, M: 1, L: 2 } as const;
     return {
       ...productDetail,
+      product_size: [...product_size].sort(
+        (left, right) =>
+          (sizeOrder[left.size as keyof typeof sizeOrder] ?? 99) -
+          (sizeOrder[right.size as keyof typeof sizeOrder] ?? 99),
+      ),
       toppings: product_toppings.map(({ toppings }) => toppings),
     };
   }

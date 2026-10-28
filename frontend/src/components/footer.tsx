@@ -69,7 +69,6 @@ export default function Footer() {
             SOCIAL MEDIA
           </h3>
           <div className="flex items-center space-x-4 text-white">
-            {/* Facebook */}
             <a
               href="https://facebook.com"
               target="_blank"
@@ -82,7 +81,6 @@ export default function Footer() {
               </svg>
             </a>
 
-            {/* Instagram */}
             <a
               href="https://instagram.com"
               target="_blank"
@@ -97,7 +95,6 @@ export default function Footer() {
               </svg>
             </a>
 
-            {/* LinkedIn */}
             <a
               href="https://linkedin.com"
               target="_blank"
