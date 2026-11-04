@@ -19,7 +19,7 @@ export default function AuthInput({
 }: Props) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={name} className="text-base">{label}</label>
+      <label htmlFor={name} className="text-lg">{label}</label>
       <input
         id={name}
         name={name}
@@ -28,7 +28,7 @@ export default function AuthInput({
         required={required}
         minLength={minLength}
         autoComplete={autoComplete}
-        className="w-full bg-white px-3 py-2 text-sm outline-none"
+        className="w-full bg-white px-4 py-3 text-base outline-none"
       />
     </div>
   );

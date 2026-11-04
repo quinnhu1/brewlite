@@ -23,6 +23,7 @@ const publicUserSelect = {
   name: true,
   phone: true,
   point: true,
+  role: true,
 } as const;
 
 @Injectable()
@@ -35,9 +36,9 @@ export class AuthService {
 
   // ===================== ĐĂNG KÝ (POST /auth/register) =====================
   async register(dto: RegisterDto) {
-    // Cột email trong DB KHÔNG unique, nên phải tự kiểm tra trùng email.
+    // Kiểm tra sớm cho thông báo dễ đọc; unique lower(email) ở DB chặn cả race condition.
     const emailExists = await this.prisma.users.findFirst({
-      where: { email: dto.email },
+      where: { email: { equals: dto.email, mode: 'insensitive' } },
       select: { user_id: true },
     });
     if (emailExists) {
@@ -58,12 +59,12 @@ export class AuthService {
         select: publicUserSelect,
       });
     } catch (e) {
-      // P2002 = vi phạm cột unique. Trong bảng users chỉ "phone" là unique.
+      // P2002 = vi phạm unique phone hoặc email chuẩn hóa.
       if (
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === 'P2002'
       ) {
-        throw new ConflictException('Số điện thoại đã được đăng ký'); // 409
+        throw new ConflictException('Email hoặc số điện thoại đã được đăng ký');
       }
       throw e; // lỗi khác: ném lại, không che giấu
     }
@@ -73,7 +74,12 @@ export class AuthService {
   async login(dto: LoginDto) {
     // Hỗ trợ cả email lẫn số điện thoại như nhãn trên giao diện.
     const user = await this.prisma.users.findFirst({
-      where: { OR: [{ email: dto.identifier }, { phone: dto.identifier }] },
+      where: {
+        OR: [
+          { email: { equals: dto.identifier, mode: 'insensitive' } },
+          { phone: dto.identifier },
+        ],
+      },
     });
 
     // So sánh mật khẩu nhập vào với chuỗi đã băm trong cột "password".
@@ -96,6 +102,7 @@ export class AuthService {
         name: user.name,
         phone: user.phone,
         point: user.point,
+        role: user.role,
       },
     };
   }
@@ -136,11 +143,24 @@ export class AuthService {
       data.password = await bcrypt.hash(dto.password, SALT_ROUNDS);
     }
 
-    return this.prisma.users.update({
-      where: { user_id: userId },
-      data,
-      select: publicUserSelect,
-    });
+    try {
+      return await this.prisma.users.update({
+        where: { user_id: userId },
+        data,
+        select: publicUserSelect,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException('Số điện thoại đã được đăng ký');
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      )
+        throw new UnauthorizedException('Tài khoản không còn tồn tại');
+      throw error;
+    }
   }
-
 }

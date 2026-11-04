@@ -3,12 +3,12 @@ import Image from 'next/image';
 
 export default function NewDrinkSection() {
   return (
-    <section className="w-full bg-[#F2ECE4] py-16 px-8 md:px-16 lg:px-24">
+    <section className="w-full bg-[#f2ebe4] py-16 px-8 md:px-16 lg:px-24">
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16">
-        
+
         {/* CỘT TRÁI */}
         <div className="w-full lg:w-[58%] flex flex-col items-start text-[#2B100C]">
-          
+
           {/* Header Title */}
           <div className="relative">
             <h2 className="text-6xl sm:text-7xl lg:text-[5.5rem] font-black tracking-tight leading-[0.95] uppercase">
@@ -25,8 +25,8 @@ export default function NewDrinkSection() {
           </h3>
 
           <p className="mt-6 text-base sm:text-lg text-[#2B100C] leading-relaxed max-w-xl font-normal opacity-90">
-            A refreshing coffee drink made with espresso, cold milk and ice. It has a smooth, 
-            light flavor, balancing the strength of espresso with the creaminess of milk. 
+            A refreshing coffee drink made with espresso, cold milk and ice. It has a smooth,
+            light flavor, balancing the strength of espresso with the creaminess of milk.
             Perfect for hot days or when you want a cool, energizing coffee without being too strong.
           </p>
 

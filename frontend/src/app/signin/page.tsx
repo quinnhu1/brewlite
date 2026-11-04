@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthInput from "@/components/account/input";
-import { apiRequest } from "@/libs/api";
+import { authApi } from "@/lib/api/auth";
 
 function SignInContent() {
   const router = useRouter();
@@ -25,13 +25,10 @@ function SignInContent() {
     const password = String(formData.get("password") ?? "");
 
     try {
-      const res = await apiRequest("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ identifier, password }),
-      });
+      const res = await authApi.login(identifier, password);
 
       // Backend hiện trả về accessToken (camelCase). Hỗ trợ thêm các tên cũ để tương thích.
-      const token = res.accessToken ?? res.access_token ?? res.token;
+      const token = res.accessToken;
       if (typeof token !== "string" || token.length === 0) {
         throw new Error("Đăng nhập phản hồi thành công nhưng không có token. Vui lòng kiểm tra API backend.");
       }
@@ -41,7 +38,8 @@ function SignInContent() {
         localStorage.setItem("user", JSON.stringify(res.user));
       }
 
-      router.replace("/account");
+      const next = searchParams.get("next");
+      router.replace(res.user.role === "admin" && !next ? "/admin" : next?.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/account");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Email/số điện thoại hoặc mật khẩu không chính xác.");
     } finally {
@@ -50,8 +48,8 @@ function SignInContent() {
   };
 
   return (
-    <main className="mx-auto flex min-h-[60vh] w-full max-w-2xl flex-col gap-6 px-6 pt-32 pb-16">
-      <h1 className="text-2xl font-bold">Sign in</h1>
+    <main className="mx-auto flex min-h-[60vh] w-full max-w-[740px] flex-col gap-6 px-6 pt-[180px] pb-16">
+      <h1 className="text-[28px] font-bold">Sign in</h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
@@ -63,7 +61,7 @@ function SignInContent() {
         <button
           type="submit"
           disabled={loading}
-          className="mx-auto w-48 rounded-full bg-[#2b140e] py-3 text-lg font-semibold text-white disabled:opacity-50"
+          className="mx-auto w-[380px] max-w-full rounded-full bg-[#2b140e] py-4 text-xl font-semibold text-white disabled:opacity-50"
         >
           {loading ? "Signing in..." : "Sign in"}
         </button>

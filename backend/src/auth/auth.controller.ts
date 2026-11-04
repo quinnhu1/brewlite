@@ -45,10 +45,7 @@ export class AuthController {
   @Patch('profile')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  updateProfile(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: UpdateProfileDto,
-  ) {
+  updateProfile(@CurrentUser() user: AuthUser, @Body() dto: UpdateProfileDto) {
     return this.auth.updateProfile(user.user_id, dto);
   }
 }

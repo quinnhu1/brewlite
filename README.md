@@ -1,149 +1,175 @@
-# BrewLite
+# BrewLite · Craft & Grind
 
-BrewLite là đồ án web đặt đồ uống, sử dụng Next.js/React cho giao diện, NestJS cho API, PostgreSQL làm cơ sở dữ liệu và Prisma làm ORM.
+Next.js 16.4.2 + NestJS 12 + PostgreSQL 16 + Prisma 6.19.3. Bản cập nhật theo diagram database và PDF giao diện SWE_CFM: sửa catalog, giao diện khách hàng, admin và VNPay Sandbox. Giữ nguyên schema và cả 4 migrations có sẵn trong ZIP được gửi.
 
-## Công nghệ và cấu trúc
+Đọc [báo cáo dữ liệu/giao diện](docs/AUDIT.md), [đối chiếu 10 task](docs/COMPARISON-AND-TASKS.md), [VNPay](docs/VNPAY.md), [kiểm chứng](docs/VALIDATION.md). Mặc định gateway là **VNPay Sandbox**. Nhóm chưa đăng ký merchant nên cần hoàn tất cấu hình trước khi thanh toán qua VNPay; ứng dụng không tự nhận thành công khi thiếu cấu hình.
 
-- `frontend/`: Next.js, React, TypeScript, Tailwind CSS.
-- `backend/`: NestJS, REST API và Prisma.
-- `backend/prisma/migrations/`: migration tạo/cập nhật schema.
-- `backend/prisma/seed/seed-data.sql`: dữ liệu mẫu lịch sử.
-- `backend/prisma/seed/menu-demo.sql`: sản phẩm mẫu cho các danh mục menu.
-- `docker-compose.yaml`: PostgreSQL chạy bằng Docker Compose (giữ nguyên tên file của branch `mintriu`).
+## 1. Chuẩn bị trên Windows
 
-## 1. Chuẩn bị môi trường
+Giải nén vào một thư mục mới, ví dụ `D:\Data\brewlite-fixed`. ZIP không chứa `.env`, `.git`, `node_modules`, `.next`, `dist` hoặc volume database. Nếu cập nhật GitHub của nhóm, tạo branch, đối chiếu thay đổi rồi chép source; giữ các commit và cấu hình riêng của nhóm.
 
-Cần cài Node.js (Node.js 22 LTS trở lên phù hợp với bộ công cụ hiện tại), npm, Git và Docker Desktop/WSL 2 trên Windows.
-
-Từ thư mục gốc dự án, mở PowerShell và tạo file môi trường:
+Cần Node.js 24 và Docker Desktop. Mở PowerShell tại thư mục có `docker-compose.yaml`:
 
 ```powershell
-Copy-Item .env.example .env
-Copy-Item backend/.env.example backend/.env
-Copy-Item frontend/.env.example frontend/.env.local
+cd D:\Data\brewlite-fixed
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+if (!(Test-Path frontend/.env.local)) { Copy-Item frontend/.env.example frontend/.env.local }
+docker ps --format "table {{.Names}}\t{{.Ports}}"
 ```
 
-Các file `.env` chỉ dùng trên máy cá nhân, không commit lên Git. Mật khẩu `CONGNGHEPHANMEM12345` được giữ để tương thích với cấu hình/volume Docker local hiện có; chỉ dùng cho môi trường phát triển, không dùng trên production. Nếu đổi user/password/port PostgreSQL trong root `.env`, hãy cập nhật `DATABASE_URL` và `DIRECT_URL` trong `backend/.env` cho khớp.
+Giữ mật khẩu PostgreSQL đang dùng. `backend/.env` cần `DATABASE_URL` và `DIRECT_URL` trỏ đúng DB. Ví dụ khi DB tên `brewlite`, user `brewlite`, cổng Windows 5433:
 
-## 2. Khởi động PostgreSQL
-
-Ở thư mục gốc:
-
-```powershell
-docker compose up -d db
-docker compose ps
+```dotenv
+DATABASE_URL=postgresql://brewlite:CONGNGHEPHANMEM12345@localhost:5433/brewlite?schema=public
+DIRECT_URL=postgresql://brewlite:CONGNGHEPHANMEM12345@localhost:5433/brewlite?schema=public
+JWT_SECRET=replace_with_a_long_random_secret
+FRONTEND_URL=http://localhost:3000
+PAYMENT_PROVIDER=vnpay
+PAYMENT_MOCK_ALLOW_OVERRIDE=false
+PAYMENT_ALLOW_MOCK_IN_PRODUCTION=false
+VNPAY_TMN_CODE=
+VNPAY_HASH_SECRET=
+VNPAY_RETURN_URL=http://localhost:3001/payments/vnpay/return
 ```
 
-Mặc định PostgreSQL được publish tại `localhost:5433` trên máy host và lắng nghe cổng `5432` bên trong container.
+Thay password/JWT ví dụ bằng cấu hình của bạn. Thay `POSTGRES_PASSWORD` trong `.env` không tự đổi mật khẩu một volume đã khởi tạo. Nếu tên DB thực tế là `brewlite_try`, phải đổi cả URL và `-DbName` ở lệnh reset sang tên đó. Frontend dùng `NEXT_PUBLIC_API_URL=http://localhost:3001`.
 
-## 3. Tạo schema và Prisma Client
+Nếu container `brewlite-postgres` cũ đang chạy, dùng container đó. Chỉ chạy `docker compose up -d db` khi chưa có DB/container. Đổi thư mục có thể đổi Compose project và tạo volume mới; không tạo container trùng tên hoặc vô tình mở DB khác.
+
+## 2. Thay toàn bộ data cũ bằng data mới
+
+**Thao tác này xóa tất cả tài khoản cũ, đơn, giao dịch, điểm và catalog trong DB được chọn**, rồi tạo catalog mới cùng hai tài khoản demo. Schema, `_prisma_migrations` và volume được giữ nguyên. Script sao lưu trước, kiểm tra backup đọc được, rồi mới reset trong transaction; lỗi SQL sẽ rollback.
+
+Dừng hai terminal frontend/backend bằng `Ctrl+C`. Tại thư mục gốc chạy:
 
 ```powershell
-cd backend
+powershell -ExecutionPolicy Bypass -File .\scripts\Reset-AndSeed.ps1 -ConfirmReset RESET_ALL_BREWLITE
+```
+
+Thông số mặc định: container `brewlite-postgres`, user `brewlite`, database `brewlite`. Nếu khác:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Reset-AndSeed.ps1 -ConfirmReset RESET_ALL_BREWLITE -Container brewlite-postgres -DbUser brewlite -DbName brewlite_try
+```
+
+Backup nằm trong `backups/<database>-before-reset-<timestamp>.dump`. Đây là custom dump, dùng `pg_restore` để phục hồi; không mở bằng `psql`. Không cần `docker compose down -v`, DROP DATABASE hay DROP TABLE.
+
+Script dùng `backend/prisma/reset-and-seed.sql`. File SQL gửi riêng có cùng nội dung. Nó chỉ chạy trên schema BrewLite đã migrate, không phải file tự tạo database/bảng. Với database mới/rỗng, xem bước 3 và dùng seed thông thường.
+
+Nếu muốn nhập file SQL riêng bằng tay, sao lưu trước:
+
+```powershell
+docker exec brewlite-postgres pg_dump -U brewlite -d brewlite -Fc -f /tmp/brewlite-before-reset.dump
+docker exec brewlite-postgres pg_restore -l /tmp/brewlite-before-reset.dump
+docker cp brewlite-postgres:/tmp/brewlite-before-reset.dump .\brewlite-before-reset.dump
+```
+
+Chỉ tiếp tục khi cả ba lệnh thành công và file backup đã có trên Windows. Sau đó:
+
+```powershell
+docker cp .\backend\prisma\reset-and-seed.sql brewlite-postgres:/tmp/brewlite-reset-and-seed.sql
+docker exec brewlite-postgres psql -v ON_ERROR_STOP=1 -U brewlite -d brewlite -c "SET brewlite.confirm_reset='RESET_ALL_BREWLITE';" -f /tmp/brewlite-reset-and-seed.sql
+```
+
+Chạy trực tiếp SQL thiếu `SET ...` sẽ bị chặn trước TRUNCATE. Nếu có bảng/constraint riêng của nhóm, kiểm tra khác biệt trước; file không dùng CASCADE để xóa lan sang bảng lạ.
+
+Sau reset: **21 món, 57 size, 13 topping, 47 liên kết topping, 2 khuyến mãi, 2 tài khoản; 0 đơn/0 payment/0 điểm**. 18 đồ uống có S/M/L với phụ thu 0/5.000/10.000đ; 3 bánh dùng `S` trong DB và hiển thị “Standard portion”, không cần topping. Tồn kho demo mỗi món 50. Hai tên trà lài và hai bản Trà sữa truyền thống được gộp; Trà sữa matcha vẫn là món riêng.
+
+## 3. Cài và chạy ứng dụng
+
+Terminal backend:
+
+```powershell
+cd D:\Data\brewlite-fixed\backend
 npm ci
-npx prisma generate
 npx prisma migrate deploy
-```
-
-Migration đầu tiên tạo các bảng nền tảng; migration tiếp theo thêm cột `categories` mà API menu sử dụng. Không dùng `prisma db push` thay cho migration trong quy trình nhóm vì nó có thể làm schema local lệch khỏi lịch sử migration trên Git.
-
-### Nạp dữ liệu demo
-
-Sau khi chạy migration, quay về thư mục gốc để chạy lệnh Docker Compose:
-
-```powershell
-cd ..
-```
-
-Trên database rỗng, nạp dữ liệu lịch sử/trà mẫu trước (chỉ một lần):
-
-```powershell
-docker cp backend/prisma/seed/seed-data.sql brewlite-postgres:/tmp/seed-data.sql
-docker compose exec db psql -U brewlite -d brewlite -f /tmp/seed-data.sql
-```
-
-Sau đó nạp menu demo cho các tab cà phê, đồ uống lạnh, trà và bánh. Script dùng ID cố định và `ON CONFLICT DO NOTHING`, nên có thể chạy lại an toàn:
-
-```powershell
-docker cp backend/prisma/seed/menu-demo.sql brewlite-postgres:/tmp/menu-demo.sql
-docker compose exec db psql -U brewlite -d brewlite -f /tmp/menu-demo.sql
-```
-
-Nếu database đã có dữ liệu từ lần chạy trước, **không chạy lại** `seed-data.sql`; chỉ chạy migration còn thiếu và `menu-demo.sql`.
-
-## 4. Chạy backend và frontend
-
-Chạy backend trong terminal thứ nhất:
-
-```powershell
-cd backend
-npm ci
+npm run db:seed
 npm run start:dev
 ```
 
-API chạy tại `http://localhost:3001`; tài liệu Swagger ở `http://localhost:3001/swagger`.
+`db:seed` dùng `prisma/seed/catalog.sql`, không xóa đơn/user và không đặt lại tồn kho/version. Trên DB cũ nó có thể giữ món ngoài catalog; muốn thay toàn bộ phải dùng bước 2. Không chạy lại seed mỗi lần vừa sửa giá/món qua admin vì seed cập nhật các thuộc tính catalog mẫu.
 
-Chạy frontend trong terminal thứ hai:
+Nếu `npm ci` báo `getaddrinfo ENOTFOUND binaries.prisma.sh`, đó là lỗi phân giải DNS/tải Prisma engine, chưa phải lỗi SQL. Kiểm tra `Resolve-DnsName binaries.prisma.sh`, đổi mạng/DNS hoặc xử lý VPN/proxy đang dùng, rồi chạy lại `npm ci`. `npm ci --ignore-scripts` chưa tạo Prisma Client; khi mạng hoạt động cần chạy `npx prisma generate`. Đừng bỏ bước generate rồi cho rằng backend đã sẵn sàng.
+
+Terminal frontend:
 
 ```powershell
-cd frontend
+cd D:\Data\brewlite-fixed\frontend
 npm ci
 npm run dev
 ```
 
-Mở `http://localhost:3000`. Frontend gọi backend theo `NEXT_PUBLIC_API_URL` trong `frontend/.env.local`.
+- Web: <http://localhost:3000>
+- Menu: <http://localhost:3000/menu>
+- Admin: <http://localhost:3000/admin>
+- API/Swagger: <http://localhost:3001/swagger>
 
-## 5. Kiểm tra trước khi push
+Sau khi đổi catalog, xóa giỏ cũ trong trình duyệt trước khi đặt món; localStorage không nằm trong PostgreSQL. Có thể mở DevTools → Console trên `localhost:3000` và chạy:
+
+```javascript
+localStorage.removeItem('brewlite-cart-v3'); location.reload();
+```
+
+## 4. Tài khoản sau reset/seed trên DB mới
+
+| Vai trò | Email đăng nhập | Số điện thoại | Mật khẩu demo |
+| --- | --- | --- | --- |
+| Admin | admin@brewlite.local | 0900000000 | BrewLite@2026! |
+| Customer | demo@brewlite.local | 0900000001 | BrewLite@2026! |
+
+Mật khẩu trong SQL là bcrypt hash. Admin đăng nhập sẽ vào `/admin`; customer thường không được mở API admin dù gõ URL thủ công. Đổi mật khẩu ở Account trước khi công khai hệ thống.
+
+Admin có Products (thêm/sửa, tìm/lọc, giá, kho, trạng thái bán, size, topping), Order Tracking và Order History. Ngừng bán bằng `Active`, giữ lịch sử hóa đơn. Khi kho/version vừa thay đổi bởi đơn khác, thao tác lưu trả 409 và cần tải lại để không ghi đè tồn kho.
+
+Đơn chỉ chuyển PAID → PREPARING → READY → COMPLETED. Admin không có nút tự đánh dấu giao dịch VNPay thành công. Chi tiết và lịch sử lấy dữ liệu thực của tất cả khách.
+
+## 5. VNPay Sandbox
+
+Đọc [docs/VNPAY.md](docs/VNPAY.md) để đăng ký merchant, cấu hình IPN/ReturnUrl và thử thanh toán. Không đưa HashSecret vào frontend hoặc gửi secret trong chat. Khi chưa điền merchant, khách vẫn xem menu, giỏ và admin; bước xác nhận thanh toán báo chưa cấu hình.
+
+Nếu chỉ cần trình diễn mock theo Task 8 trong lúc chờ đăng ký, chủ động đổi các biến dưới đây trong `backend/.env` (hoặc root `.env` khi chạy Compose), rồi khởi động lại backend:
+
+```dotenv
+PAYMENT_PROVIDER=mock
+PAYMENT_MOCK_ALLOW_OVERRIDE=true
+PAYMENT_ALLOW_MOCK_IN_PRODUCTION=true
+```
+
+Mock được ghi rõ là giả lập Ví/Thẻ, có thể chọn thành công/thất bại để demo; không phải giao dịch VNPay. Khi dùng VNPay, trả provider về `vnpay` và hai cờ về `false`.
+
+## 6. Docker Compose ba dịch vụ
+
+Chỉ dùng Compose project đang sở hữu đúng volume dữ liệu của nhóm. Tắt app local đang giữ cổng 3000/3001, tạo root `.env` và điền JWT/DB/VNPay như trên:
 
 ```powershell
-# frontend
-cd frontend
-npm run lint
-npm run build
+docker compose --profile app up -d --build
+docker compose --profile app exec backend npm run db:seed
+docker compose --profile app ps
+```
 
-# backend (mở terminal khác)
+Có `--profile app` mới bật frontend/backend; `up -d db` chỉ chạy DB. Backend đợi DB healthy, migrate khi khởi động, frontend đợi backend healthy. Database giữa container dùng `db:5432`; Windows dùng 5433. Thay `NEXT_PUBLIC_API_URL` cần build lại frontend; biến secret chỉ thuộc backend. Cấu hình Compose/Dockerfile đã được rà soát, cần chạy xác nhận trên Docker Desktop của nhóm; môi trường kiểm thử lần này không có Docker daemon.
+
+## 7. Kiểm thử và tài liệu nộp môn
+
+```powershell
+npm run check
+```
+
+Lệnh này chạy build/lint/unit backend và lint/build frontend. Integration cần DB RIÊNG tên kết thúc `_test`, tuyệt đối không trỏ vào DB đồ án đang dùng vì test sẽ TRUNCATE:
+
+```powershell
+docker exec brewlite-postgres createdb -U brewlite brewlite_test
 cd backend
-npm run lint
-npm test -- --runInBand
-npm run build
+$env:DATABASE_URL = 'postgresql://brewlite:CONGNGHEPHANMEM12345@localhost:5433/brewlite_test?schema=public'
+$env:DIRECT_URL = $env:DATABASE_URL
+$env:TEST_DATABASE_URL = $env:DATABASE_URL
+$env:JWT_SECRET = 'integration-test-only-long-secret'
+$env:ORDER_EXPIRY_WORKER = 'false'
+npx prisma migrate deploy
+npm run db:seed
+npm run test:e2e -- --runInBand
+Remove-Item Env:DATABASE_URL,Env:DIRECT_URL,Env:TEST_DATABASE_URL,Env:JWT_SECRET,Env:ORDER_EXPIRY_WORKER
 ```
 
-## Lưu ý về dữ liệu demo và phạm vi
-
-`seed-data.sql` giữ dữ liệu trà và lịch sử đơn hàng đã có; `menu-demo.sql` bổ sung món mẫu cho các tab menu và cấu hình size/topping demo. Ảnh món demo dùng ảnh local `frontend/public/images/espresso.jpg`; hãy thay bằng asset đúng khi có ảnh thật.
-
-Phần merge này đưa danh sách menu và trang chi tiết vào cùng hợp đồng API. Giỏ hàng hiện được lưu ở `localStorage`; luồng tạo đơn hàng/thanh toán end-to-end vẫn cần tích hợp và kiểm thử riêng trước khi tuyên bố hoàn thiện toàn bộ nghiệp vụ.
-## 6. Làm việc trên branch cá nhân (không sửa trực tiếp `main`)
-
-**Cách khuyên dùng:** giữ nguyên lịch sử commit của các thành viên bằng cách merge `tlong` vào branch `mintriu`, rồi áp dụng patch chỉ chứa các chỉnh sửa tích hợp. Patch được kiểm tra trên snapshot `mintriu` `bff4023` và `tlong` `582d293`. Đặt file `BrewLite-PostMerge-Fixes.patch` ở thư mục gốc dự án.
-
-```powershell
-git switch mintriu
-git status --short
-git rev-parse --short HEAD
-# HEAD phải là bff4023 và working tree phải sạch.
-
-git fetch origin refs/heads/tlong:refs/remotes/origin/tlong
-git rev-parse --short origin/tlong
-# Với snapshot đã kiểm tra, kết quả phải là 582d293. Nếu khác, dừng và kiểm tra lại patch.
-
-git merge --no-ff origin/tlong -m "merge: integrate tlong menu and product detail"
-
-git apply --check --ignore-space-change --ignore-whitespace .\BrewLite-PostMerge-Fixes.patch
-git apply --ignore-space-change --ignore-whitespace .\BrewLite-PostMerge-Fixes.patch
-
-git diff --check
-git diff
-```
-
-Chạy các lệnh lint/build/test ở mục trước. Nếu đạt, commit phần chỉnh sửa và push lên branch cá nhân để leader review qua PR:
-
-```powershell
-git add -A
-git commit -m "fix: align menu with product API and database schema"
-git push origin mintriu
-```
-
-**Phương án thay thế:** nếu không muốn merge `origin/tlong` trước, có thể áp dụng `BrewLite-Triu-Integrated.patch` trực tiếp lên commit `bff4023`. Patch đầy đủ này chứa cả thay đổi code từ `tlong` và phần chỉnh sửa tích hợp, nhưng không giữ riêng lịch sử commit của nhánh `tlong`. Chọn **một** trong hai phương án, không áp dụng cả hai.
-
-Nếu `HEAD` không ở commit nền yêu cầu, branch remote đã đổi hoặc `git apply --check` thất bại, đừng dùng `reset --hard`, đừng force-push và đừng ép patch. Đồng bộ lại branch và kiểm tra xung đột trước khi tiếp tục.
+Thay password ví dụ bằng mật khẩu DB của bạn. Các kiểm thử callback ký bằng khóa nội bộ kiểm tra logic code, không thay thế lần thanh toán với merchant Sandbox đã đăng ký. Kết quả và giới hạn nằm ở `docs/VALIDATION.md`. Minh chứng Scrum/PR/review/DoD do nhóm điền thật theo `docs/SPRINT-HANDOVER.md`.

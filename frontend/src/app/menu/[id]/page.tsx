@@ -4,7 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProductDetail from '@/components/menu/product-detail';
 import type { Product } from '@/components/menu/product-detail';
-import { fetchProducts } from '@/libs/api';
+import { fetchProducts } from '@/lib/api/products';
+import { getProductImageUrl } from '@/data/categories';
 import { useCartStore } from '@/store/useCartStore';
 
 function ProductDetailPageContent() {
@@ -33,7 +34,7 @@ function ProductDetailPageContent() {
           name: item.productName,
           price: Number(item.basePrice),
           category: item.categories || 'Khác',
-          image: item.imageUrl?.startsWith('/') ? item.imageUrl : '/images/espresso.jpg',
+          image: getProductImageUrl(item.imageUrl),
           stock: item.stock,
           isBestSeller: item.isBestSeller,
         });
@@ -55,7 +56,7 @@ function ProductDetailPageContent() {
 
   if (error && !isCurrentProductLoaded) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F2ECE4] px-6 pt-24">
+      <main className="flex min-h-screen items-center justify-center bg-[#f2ebe4] px-6 pt-24">
         <div className="max-w-lg rounded-2xl border border-rose-200 bg-white p-6 text-center">
           <h1 className="text-lg font-bold text-rose-800">Không thể tải sản phẩm</h1>
           <p className="mt-2 text-sm text-stone-700">{error}</p>
@@ -73,14 +74,14 @@ function ProductDetailPageContent() {
 
   if (loading || !isCurrentProductLoaded || !product) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F2ECE4] px-6 pt-24 text-[#6F4E37]">
+      <main className="flex min-h-screen items-center justify-center bg-[#f2ebe4] px-6 pt-24 text-[#6F4E37]">
         Đang tải sản phẩm…
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen w-full bg-[#F2ECE4] px-6 pb-10 pt-24 md:px-12">
+    <main className="min-h-screen w-full bg-[#f2ebe4] px-6 pb-10 pt-24 md:px-12">
       <ProductDetail
         key={product.id}
         product={product}
@@ -98,7 +99,7 @@ export default function ProductDetailPage() {
   return (
     <Suspense
       fallback={(
-        <div className="flex min-h-screen w-full items-center justify-center bg-[#F2ECE4] pb-10 text-[#6F4E37]">
+        <div className="flex min-h-screen w-full items-center justify-center bg-[#f2ebe4] pb-10 text-[#6F4E37]">
           Đang tải trang sản phẩm…
         </div>
       )}

@@ -1,240 +1,179 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { apiRequest } from "@/libs/api";
-
-const tabs = ["Account", "Order Tracking", "Order History"] as const;
-
-interface UserProfile {
-  id?: string;
-  name?: string;
-  username?: string;
-  email?: string;
-  phone?: string;
-  points?: number;
-  point?: number;
-  tier?: string;
-}
-
-export default function AccountPage() {
-  const router = useRouter();
-  const [tab, setTab] = useState<(typeof tabs)[number]>("Account");
-
-  // State quản lý thông tin người dùng
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    password: "",
-  });
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [message, setMessage] = useState("");
-
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { authApi, type UserProfile } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
+import OrderList from "@/components/orders/order-list";
+function AccountContent() {
+  const router = useRouter(),
+    params = useSearchParams();
+  const selected = params.get("tab") ?? "Account";
+  const [user, setUser] = useState<UserProfile | null>(null),
+    [name, setName] = useState(""),
+    [phone, setPhone] = useState(""),
+    [password, setPassword] = useState(""),
+    [error, setError] = useState(""),
+    [status, setStatus] = useState(""),
+    [saving, setSaving] = useState(false);
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/signin");
-      return;
-    }
-
-    const fetchUserProfile = async () => {
-      try {
-        // Gọi API backend lấy thông tin người dùng
-        const res = await apiRequest("/auth/me");
-        const userData = (
-          res.user && typeof res.user === "object" ? res.user : res
-        ) as UserProfile;
-        setUser(userData);
-        setFormData({
-          name: userData.name || userData.username || "",
-          phone: userData.phone || "",
-          email: userData.email || "",
-          password: "",
-        });
-      } catch {
-        // Lấy dữ liệu từ localStorage đã lưu lúc đăng nhập
-        const cachedUser = localStorage.getItem("user");
-        if (cachedUser) {
-          try {
-            const parsed = JSON.parse(cachedUser);
-            setUser(parsed);
-            setFormData({
-              name: parsed.name || parsed.username || "",
-              phone: parsed.phone || "",
-              email: parsed.email || "",
-              password: "",
-            });
-          } catch {
-            router.push("/signin");
-          }
-        } else {
-          router.push("/signin");
+    let live = true;
+    authApi
+      .me()
+      .then((u) => {
+        if (live) {
+          setUser(u);
+          setName(u.name);
+          setPhone(u.phone);
         }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, [router]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    router.push("/signin");
-  };
-
-  const handleSave = async () => {
-    setMessage("");
-    setUpdating(true);
-    try {
-      await apiRequest("/auth/profile", {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: formData.name,
-          phone: formData.phone,
-          ...(formData.password ? { password: formData.password } : {}),
-        }),
+      })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 401)
+          router.replace("/signin?next=%2Faccount");
+        else if (live) setError(e.message);
       });
-
-      const updatedUser = { ...user, name: formData.name, phone: formData.phone };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setMessage("Cập nhật thông tin thành công!");
-    } catch (err: unknown) {
-      setMessage(
-        err instanceof Error
-          ? err.message
-          : "Cập nhật thất bại, vui lòng thử lại.",
-      );
+    return () => {
+      live = false;
+    };
+  }, [router]);
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    setStatus("");
+    try {
+      const u = await authApi.profile({
+        name,
+        phone,
+        ...(password ? { password } : {}),
+      });
+      setUser(u);
+      setPassword("");
+      setStatus("Cập nhật thông tin thành công.");
+      localStorage.setItem("user", JSON.stringify(u));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không lưu được.");
     } finally {
-      setUpdating(false);
+      setSaving(false);
     }
-  };
-
-  if (loading) {
+  }
+  if (!user)
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center">
-        <p className="text-gray-600 font-medium">Đang tải thông tin tài khoản...</p>
+      <main className="pt-40 text-center">
+        {error || "Đang tải tài khoản..."}
       </main>
     );
-  }
-
   return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-6 py-10 md:grid-cols-[280px_1fr]">
-      {/* Sidebar */}
-      <aside className="rounded-lg border border-[#2b140e] p-4">
-        <div className="flex items-center gap-3">
-          <div className="h-16 w-16 rounded-full bg-white flex items-center justify-center font-bold text-xl text-[#2b140e] border border-[#2b140e]/20 shadow-inner">
-            {(user?.name || user?.username || "U").charAt(0).toUpperCase()}
-          </div>
-          <div className="text-sm">
-            <p className="font-semibold">{user?.username || user?.name || "Member"}</p>
-            <p className="text-gray-600">point: {user?.points ?? user?.point ?? 0}</p>
-            <p className="text-gray-600 capitalize">{user?.tier || "Bronze member"}</p>
+    <main className="account-shell">
+      <aside className="account-sidebar">
+        <div className="flex items-center gap-5">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full border border-[#b79c87] bg-white text-3xl">
+            {user.name[0]?.toUpperCase()}
+          </span>
+          <div>
+            <strong>{user.name}</strong>
+            <p>point: {user.point}</p>
+            <p className="text-sm">
+              {user.role === "admin" ? "Administrator" : "Member"}
+            </p>
           </div>
         </div>
-
-        <nav className="mt-8 flex flex-col gap-3">
-          {tabs.map((t) => (
+        <nav>
+          {["Account", "Order Tracking", "Order History"].map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
-              className={`rounded-full px-4 py-2 text-left font-semibold transition ${
-                tab === t ? "bg-[#2b140e] text-white" : "hover:bg-gray-100"
-              }`}
+              className={selected === t ? "active" : ""}
+              onClick={() =>
+                router.replace("/account?tab=" + encodeURIComponent(t))
+              }
             >
               {t}
             </button>
           ))}
+          {user.role === "admin" && (
+            <Link href="/admin" className="mt-8 text-center underline">
+              Open Admin Portal
+            </Link>
+          )}
         </nav>
       </aside>
-
-      {/* Nội dung bên phải */}
-      <section className="rounded-lg border border-[#2b140e] p-6">
-        {tab === "Account" && (
+      <section className="account-content">
+        {selected === "Account" ? (
           <>
-            <h2 className="mb-4 text-center text-lg font-semibold">Account Details</h2>
-
-            {message && (
-              <p className={`mb-4 text-center text-sm font-medium ${message.includes("thành công") ? "text-emerald-700" : "text-red-500"}`}>
-                {message}
-              </p>
-            )}
-
-            {/* Các trường nhập chi tiết tài khoản */}
-            <div className="flex flex-col gap-4 max-w-md mx-auto">
-              <div>
-                <label className="text-xs font-semibold text-gray-600">Name</label>
+            <h2>Account Details</h2>
+            <form className="account-fields" onSubmit={save}>
+              <label>
+                Name
                 <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Your Name"
-                  className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-[#2b140e] focus:outline-none"
+                  value={name}
+                  required
+                  maxLength={50}
+                  onChange={(e) => setName(e.target.value)}
                 />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600">Phone number</label>
+              </label>
+              <label>
+                Phone number
                 <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="Phone number"
-                  className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-[#2b140e] focus:outline-none"
+                  value={phone}
+                  required
+                  pattern="0[0-9]{9}"
+                  onChange={(e) => setPhone(e.target.value)}
                 />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  disabled
-                  placeholder="Email"
-                  className="w-full rounded-full border border-gray-200 bg-gray-100 px-4 py-2 text-sm text-gray-500 cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600">New Password (để trống nếu không đổi)</label>
+              </label>
+              <label>
+                Email
+                <input value={user.email} disabled />
+              </label>
+              <label>
+                New password (để trống nếu giữ nguyên)
                 <input
                   type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="••••••••"
-                  className="w-full rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-[#2b140e] focus:outline-none"
+                  autoComplete="new-password"
+                  minLength={6}
+                  maxLength={72}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
+              </label>
+              {error && (
+                <p role="alert" className="form-error">
+                  {error}
+                </p>
+              )}
+              {status && (
+                <p role="status" className="form-status">
+                  {status}
+                </p>
+              )}
+              <div className="account-buttons">
+                <button className="coffee-button" disabled={saving}>
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className="coffee-button"
+                  onClick={() => {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
+                    router.push("/signin");
+                  }}
+                >
+                  Log out
+                </button>
               </div>
-            </div>
-
-            {/* Các nút bấm thao tác */}
-            <div className="mt-8 flex justify-between max-w-md mx-auto">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={updating}
-                className="rounded-full bg-[#6b4a35] px-8 py-2 text-white hover:opacity-90 transition disabled:opacity-50"
-              >
-                {updating ? "Saving..." : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-full bg-[#6b4a35] px-8 py-2 text-white hover:opacity-90 transition"
-              >
-                Log out
-              </button>
-            </div>
+            </form>
           </>
+        ) : (
+          <OrderList key={selected} tracking={selected === "Order Tracking"} />
         )}
-        {tab === "Order Tracking" && <p className="text-gray-600">Order Tracking...</p>}
-        {tab === "Order History" && <p className="text-gray-600">Order History...</p>}
       </section>
     </main>
+  );
+}
+export default function AccountPage() {
+  return (
+    <Suspense fallback={<p className="pt-40 text-center">Đang tải...</p>}>
+      <AccountContent />
+    </Suspense>
   );
 }

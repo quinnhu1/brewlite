@@ -3,6 +3,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { AdminGuard } from './admin.guard.js';
+import { StaffGuard } from './staff.guard.js';
 
 @Module({
   imports: [
@@ -16,15 +18,15 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
         return {
           secret,
           signOptions: {
-            expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any,
+            expiresIn: Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 604800),
           },
         };
       },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
+  providers: [AuthService, JwtAuthGuard, StaffGuard, AdminGuard],
   // Cho module khác (orders, payments) dùng guard bằng imports: [AuthModule]
-  exports: [JwtModule, JwtAuthGuard],
+  exports: [JwtModule, JwtAuthGuard, StaffGuard, AdminGuard],
 })
 export class AuthModule {}

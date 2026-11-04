@@ -5,7 +5,8 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProductDetail from '@/components/menu/product-detail';
 import type { AddToCartPayload, Product } from '@/components/menu/product-detail';
-import { fetchProducts } from '@/libs/api';
+import { fetchProducts } from '@/lib/api/products';
+import { getProductImageUrl } from '@/data/categories';
 import { useCartStore } from '@/store/useCartStore';
 
 const CATEGORY_TABS = ['Classic Coffee', 'Cold & Brewed', 'Tea', 'Pastry & Dessert', 'Best Sellers'] as const;
@@ -35,7 +36,7 @@ function MenuContent() {
           name: item.productName,
           price: Number(item.basePrice),
           category: item.categories || 'Other',
-          image: item.imageUrl?.startsWith('/') ? item.imageUrl : '/images/espresso.jpg',
+          image: getProductImageUrl(item.imageUrl),
           stock: item.stock,
           isBestSeller: item.isBestSeller,
         }));
@@ -52,16 +53,16 @@ function MenuContent() {
     return () => controller.abort();
   }, []);
 
-  // The supplied database currently contains Tea products, so make that category the default when available.
-  const defaultCategory = products.some((item) => CATEGORY_ALIASES.Tea.includes(item.category.toLowerCase()))
-    ? 'Tea'
-    : 'Classic Coffee';
-  const activeCategory = searchParams.get('category') || defaultCategory;
+  const defaultCategory = CATEGORY_TABS.find((category) => products.some((item) => CATEGORY_ALIASES[category]?.includes(item.category.trim().toLowerCase()))) ?? 'Classic Coffee';
+  const activeCategory = searchParams.get('category') || (searchParams.get('search') ? 'All' : defaultCategory);
+  const search = searchParams.get('search')?.trim().toLocaleLowerCase() ?? '';
   const filteredProducts = useMemo(() => products.filter((product) => {
+    if(search && !product.name.toLocaleLowerCase().includes(search))return false;
+    if (activeCategory === 'All') return true;
     if (activeCategory === 'Best Sellers') return Boolean(product.isBestSeller);
     const aliases = CATEGORY_ALIASES[activeCategory] ?? [activeCategory.toLowerCase()];
     return aliases.includes(product.category.toLowerCase());
-  }), [activeCategory, products]);
+  }), [activeCategory, products, search]);
 
   const handleAddToCart = (payload: AddToCartPayload) => {
     addItem(payload);
@@ -69,9 +70,9 @@ function MenuContent() {
   };
 
   return (
-    <main className="min-h-screen w-full bg-[#f3ede5] px-5 pb-20 pt-28 text-[#2b100c] md:px-10">
-      <div className="mx-auto max-w-[1120px]">
-        <nav className="mb-10 flex flex-wrap items-center justify-center gap-3 sm:gap-5" aria-label="Product categories">
+    <main className="min-h-screen w-full bg-[#f2ebe4] px-5 pb-20 pt-28 text-[#2b100c] md:px-10">
+      <div className="mx-auto max-w-[1240px]">
+        <nav className="mb-14 flex flex-wrap items-center justify-center gap-3 sm:gap-5" aria-label="Product categories">
           {CATEGORY_TABS.map((category) => {
             const active = activeCategory === category;
             return (
@@ -92,6 +93,7 @@ function MenuContent() {
           })}
         </nav>
 
+        {search && <p className="mb-5 text-center">Search: {search}</p>}
         {addedMessage && (
           <div className="mx-auto mb-5 flex max-w-[680px] flex-wrap items-center justify-between gap-3 rounded-lg border border-[#cbb7a6] bg-white/70 px-4 py-3 text-sm text-[#513421]">
             <span>{addedMessage}</span>
@@ -103,7 +105,7 @@ function MenuContent() {
         {error && (
           <div role="alert" className="mx-auto max-w-xl rounded-xl border border-[#c39f8c] bg-white p-5 text-[#552c1f]">
             <p className="font-bold">Could not load menu</p>
-            <p className="mt-2 text-sm">{error}. Check the backend and NEXT_PUBLIC_API_URL.</p>
+            <p className="mt-2 text-sm">{error}. Please try again later.</p>
             <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-full bg-[#2b100c] px-5 py-2 text-sm font-semibold text-white">Try again</button>
           </div>
         )}
@@ -124,23 +126,23 @@ function MenuContent() {
               <p className="mt-2 text-sm text-[#715039]">Choose another category to browse the available menu.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {filteredProducts.map((product) => (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => { setSelectedProduct(product); setAddedMessage(''); }}
-                  className="group flex min-h-[350px] flex-col rounded-[18px] bg-white p-5 text-left text-[#2b100c] transition hover:-translate-y-0.5"
+                  className="group flex min-h-[300px] flex-col rounded-[18px] bg-white p-5 text-left text-[#2b100c] transition hover:-translate-y-0.5"
                 >
-                  <div className="relative mb-5 h-[230px] w-full overflow-hidden bg-[#eee5dc]">
-                    <Image src={product.image} alt={product.name} fill className="object-cover transition-transform duration-300 group-hover:scale-[1.03]" sizes="(max-width: 768px) 100vw, 33vw" />
+                  <div className="relative mb-5 h-[190px] w-full overflow-hidden bg-[#eee5dc]">
+                    <Image src={product.image} alt={product.name} fill className="object-contain transition-transform duration-300 group-hover:scale-[1.03]" sizes="(max-width: 768px) 100vw, 33vw" />
                   </div>
                   <div className="mt-auto flex items-end justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-bold">{product.name}</h2>
                       <p className="mt-1 text-sm text-[#715039]">{product.stock > 0 ? `${product.stock} available` : 'Sold out'}</p>
                     </div>
-                    <span className="font-bold tabular-nums">{new Intl.NumberFormat('vi-VN').format(product.price)}</span>
+                    <span className="flex items-center gap-2 font-bold tabular-nums">{new Intl.NumberFormat('vi-VN').format(product.price)}<span aria-hidden="true" className="rounded-full bg-[#715039] px-1.5 text-lg leading-5 text-white">+</span></span>
                   </div>
                 </button>
               ))}
@@ -154,7 +156,7 @@ function MenuContent() {
 
 export default function MenuPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#f3ede5] text-[#715039]">Loading menu…</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#f2ebe4] text-[#715039]">Loading menu…</div>}>
       <MenuContent />
     </Suspense>
   );
