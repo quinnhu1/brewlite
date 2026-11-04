@@ -7,6 +7,9 @@ import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Configure an exact trusted proxy hop count only when deployed behind that proxy.
+  if (process.env.TRUST_PROXY_HOPS) app.getHttpAdapter().getInstance().set('trust proxy', Number(process.env.TRUST_PROXY_HOPS));
+  app.enableShutdownHooks();
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -24,7 +27,8 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('BrewLite API')
     .setDescription('API documentation for BrewLite')
-    .setVersion('1.0')
+    .setVersion('1.1')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -3,7 +3,10 @@ import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ example: 'long@example.com', description: 'Email hoặc số điện thoại đã đăng ký' })
+  @ApiProperty({
+    example: 'long@example.com',
+    description: 'Email hoặc số điện thoại đã đăng ký',
+  })
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )

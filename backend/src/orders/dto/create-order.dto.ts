@@ -1,6 +1,7 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsDateString,
@@ -44,6 +45,7 @@ export class CreateOrderItemDto {
 export class CreateOrderDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items!: CreateOrderItemDto[];
@@ -58,10 +60,12 @@ export class CreateOrderDto {
   pickup_method?: 'AT_COUNTER' | 'TAKEAWAY' | 'DELIVERY';
 
   @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @Length(2, 100)
   customer_name!: string;
 
   @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @Matches(/^[0-9+()\-\s]{8,20}$/, {
     message: 'customer_phone phải là số điện thoại hợp lệ (8–20 ký tự)',
   })

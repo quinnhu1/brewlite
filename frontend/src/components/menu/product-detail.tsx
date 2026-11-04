@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { fetchProductById } from '@/libs/api';
-import type { ApiProductDetail } from '@/libs/api';
+import { getProductImageUrl } from '@/data/categories';
+import { fetchProductById } from '@/lib/api/products';
+import type { ApiProductDetail } from '@/lib/api/products';
 import type { DrinkSize, ToppingOption } from '@/store/useCartStore';
 
 export interface Product {
@@ -22,6 +23,7 @@ export interface AddToCartPayload {
   image_url: string;
   base_price: number;
   size: DrinkSize;
+  add_price: number;
   toppings: ToppingOption[];
   quantity: number;
   stock: number;
@@ -104,9 +106,10 @@ export default function ProductDetail({ product, onAddToCart }: ProductDetailPro
     onAddToCart({
       product_id: details.productId,
       product_name: details.productName,
-      image_url: details.imageUrl?.startsWith('/') ? details.imageUrl : '/images/espresso.jpg',
+      image_url: getProductImageUrl(details.imageUrl),
       base_price: basePrice,
       size: selectedSize,
+      add_price: sizeExtra,
       toppings: selectedToppings,
       quantity,
       stock: details.stock,
@@ -120,11 +123,11 @@ export default function ProductDetail({ product, onAddToCart }: ProductDetailPro
       <article className="mx-auto flex min-h-[470px] w-full max-w-[395px] flex-col rounded-[18px] bg-white px-7 py-6 text-[#2B100C]">
         <div className="relative mx-auto mb-8 h-[270px] w-full max-w-[236px] overflow-hidden bg-[#eee5dc]">
           <Image
-            src={product.image.startsWith('/') ? product.image : '/images/espresso.jpg'}
+            src={getProductImageUrl(product.image)}
             alt={product.name}
             fill
             priority
-            className="object-cover"
+            className="object-contain"
             sizes="(max-width: 768px) 90vw, 236px"
           />
         </div>
@@ -163,7 +166,7 @@ export default function ProductDetail({ product, onAddToCart }: ProductDetailPro
                     title={`${option.size}${Number(option.add_price) ? `, +${money(Number(option.add_price))} VND` : ''}`}
                     className={`min-w-[74px] rounded-[14px] px-4 py-2 text-[25px] font-semibold leading-none text-white transition-colors ${selectedSize === option.size ? 'bg-[#2B100C]' : 'bg-[#715039] hover:bg-[#5c3c2a]'}`}
                   >
-                    {option.size}
+                    {details.categories === 'Pastry & Dessert' ? 'Standard portion' : option.size}
                   </button>
                 ))}
               </div>
@@ -183,7 +186,7 @@ export default function ProductDetail({ product, onAddToCart }: ProductDetailPro
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleTopping(topping)}
-                          className="h-[17px] w-[17px] shrink-0 appearance-none rounded-full border border-[#8b6c56] bg-transparent checked:border-[#2B100C] checked:bg-[#2B100C] checked:ring-2 checked:ring-[#f3ede5] checked:ring-offset-1 checked:ring-offset-[#f3ede5]"
+                          className="h-[17px] w-[17px] shrink-0 appearance-none rounded-full border border-[#8b6c56] bg-transparent checked:border-[#2B100C] checked:bg-[#2B100C] checked:ring-2 checked:ring-[#f2ebe4] checked:ring-offset-1 checked:ring-offset-[#f2ebe4]"
                         />
                         <span>{topping.topping_name}</span>
                       </label>

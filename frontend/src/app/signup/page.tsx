@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthInput from "@/components/account/input";
-import { apiRequest } from "@/libs/api";
+import { authApi } from "@/lib/api/auth";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -23,10 +23,7 @@ export default function SignUpPage() {
     const password = String(formData.get("password") ?? "");
 
     try {
-      await apiRequest("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email, name, phone, password }),
-      });
+      await authApi.register({ email, name, phone, password });
 
       // Chỉ chuyển trang khi API xác nhận đã tạo tài khoản thành công.
       router.replace("/signin?registered=1");
@@ -38,8 +35,8 @@ export default function SignUpPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-[60vh] w-full max-w-2xl flex-col gap-6 px-6 pt-32 pb-16">
-      <h1 className="text-2xl font-bold">Sign up</h1>
+    <main className="mx-auto flex min-h-[60vh] w-full max-w-[740px] flex-col gap-6 px-6 pt-[150px] pb-16">
+      <h1 className="text-[28px] font-bold">Sign up</h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && <p role="alert" className="text-sm font-medium text-red-500">{error}</p>}
@@ -52,7 +49,7 @@ export default function SignUpPage() {
         <button
           type="submit"
           disabled={loading}
-          className="mx-auto mt-2 w-48 rounded-full bg-[#2b140e] py-3 text-lg font-semibold text-white transition disabled:opacity-50"
+          className="mx-auto mt-2 w-[380px] max-w-full rounded-full bg-[#2b140e] py-4 text-xl font-semibold text-white transition disabled:opacity-50"
         >
           {loading ? "Signing up..." : "Sign up"}
         </button>

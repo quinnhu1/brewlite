@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { isUUID } from 'class-validator';
 
 // Thông tin người dùng lấy từ token, gắn vào request cho controller dùng.
 export interface AuthUser {
@@ -28,7 +29,8 @@ export class JwtAuthGuard implements CanActivate {
     try {
       // Kiểm tra chữ ký và hạn của token. Sai hoặc hết hạn thì ném lỗi.
       const payload = await this.jwt.verifyAsync<{ user_id: string }>(token);
-      (req as any).user = { user_id: payload.user_id } satisfies AuthUser;
+      if (!isUUID(payload.user_id)) throw new Error('Missing user identity');
+      (req as Request & { user: AuthUser }).user = { user_id: payload.user_id };
     } catch {
       throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
     }

@@ -1,5 +1,9 @@
 {
-  "dependencies": {
-    "lucide-react": "^1.61.0"
+  "name": "brewlite",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm --prefix backend run start:dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "check": "npm --prefix backend run build && npm --prefix backend run lint && npm --prefix backend test -- --runInBand && npm --prefix frontend run lint && npm --prefix frontend run build"
   }
 }
